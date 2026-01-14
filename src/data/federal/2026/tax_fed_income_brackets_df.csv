@@ -1,0 +1,16 @@
+"year","filing_status","bracket_num","lower_limit","upper_limit","rate"
+2026,"single_adult",1,0,11925,0.1
+2026,"single_adult",2,11926,48475,0.12
+2026,"single_adult",3,48476,103350,0.22
+2026,"single_adult",4,103351,197300,0.24
+2026,"single_adult",5,197301,Inf,0.32
+2026,"single_parent",1,0,17000,0.1
+2026,"single_parent",2,17001,64850,0.12
+2026,"single_parent",3,64851,103350,0.22
+2026,"single_parent",4,103351,197300,0.24
+2026,"single_parent",5,197301,Inf,0.32
+2026,"married",1,0,23850,0.1
+2026,"married",2,23851,96950,0.12
+2026,"married",3,96951,206700,0.22
+2026,"married",4,206701,394600,0.24
+2026,"married",5,394601,Inf,0.32
