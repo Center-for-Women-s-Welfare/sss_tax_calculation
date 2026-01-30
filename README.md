@@ -58,58 +58,6 @@ result <- calculate_sss_income(
 head(result[, c("family_type", "countyname", "calculated_starting_income")])
 ```
 
-## Usage Examples
-
-### Basic Calculation
-
-```r
-# Process a single county's data
-result <- calculate_sss_income(
-  basic_needs_df = iowa_county_data,
-  year = 2026
-)
-```
-
-### Processing Multiple Counties
-
-```r
-# Split by county and process
-counties <- split(state_data, state_data$countyname)
-
-results <- lapply(counties, function(county_df) {
-  calculate_sss_income(county_df, year = 2026)
-})
-
-# Combine results
-final_results <- do.call(rbind, results)
-```
-
-### Debug Mode
-
-```r
-# Enable detailed diagnostic output
-result <- calculate_sss_income(
-  basic_needs_df = problem_data,
-  year = 2026,
-  debug = TRUE
-)
-
-# Check convergence
-non_converged <- result[!result$converged, ]
-print(non_converged[, c("family_type", "iteration_count")])
-```
-
-### Custom Parameters
-
-```r
-# Adjust convergence settings
-result <- calculate_sss_income(
-  basic_needs_df = basic_needs,
-  year = 2026,
-  tolerance = 0.5,        # $0.50 tolerance
-  max_iterations = 150    # Allow more iterations
-)
-```
 
 ## Function Parameters
 
@@ -118,8 +66,8 @@ The main function signature is:
 ```r
 calculate_sss_income(
   basic_needs_df,           # Required: Input dataframe with 58 required columns
-  year,                     # Required: Tax year (e.g., 2026)
-  state = NULL,             # Optional: State code - NOT CURRENTLY USED in Phase 1
+  year,                     # Required: Tax year (e.g., 2026),
+  tax_params,               # tax params
   max_iterations = 100,     # Optional: Maximum solver iterations
   tolerance = 1.0,          # Optional: Convergence tolerance in dollars
   debug = FALSE             # Optional: Enable detailed diagnostic output
@@ -127,9 +75,8 @@ calculate_sss_income(
 ```
 
 **Important Note about the `state` Parameter:**
-- **Phase 1 (Current)**: The `state` parameter is included in the function signature for backward compatibility but is **not currently used**. All calculations are federal-only.
+- **Phase 1 (Current)**: The `state` parameter can be included in the function signature for backward compatibility but is **not currently used**. All calculations are federal-only.
 - **Phase 2 (Future)**: The `state` parameter will be required when state tax calculations are implemented.
-- **Recommendation**: You can safely omit the `state` parameter in Phase 1, or include it for future-proofing your code.
 
 ## Input Requirements
 
@@ -201,13 +148,10 @@ sss_tax_calculations/
 │   │           ├── tax_fed_payroll_df.csv
 │   │           └── tax_fed_sd_df.csv
 │   ├── calculations/
-│   │   ├── tax_calculation.R     # Main entry point
-│   │   ├── federal_taxes.R       # Federal tax components
-│   │   └── iterative_solver.R    # Convergence logic
+│   │   └── iterative_income_solver.R    # Convergence logic
 │   └── utils/
-│       ├── data_validation.R     # Input validation
-│       ├── data_loader.R         # Load tax parameters
-│       └── helpers.R             # Utility functions
+│       └── diagnostics.R         # Utility functions
+|       └── validation.R          
 ├── tests/                         # Test suite
 │   ├── test_tax_calculation.R
 │   ├── test_federal_taxes.R
@@ -239,6 +183,100 @@ The engine uses an iterative solver to handle the recursive nature of tax calcul
 - **Success Rate**: >99.9% convergence in testing
 
 ## Testing
+
+The solver is now integrated into the main SSS pipeline. To test it:
+
+### 1. Run the Full Pipeline
+
+```r
+# Set your working directory
+setwd("<path to SSS_CODE_BASE>")  # Or your SSS_CODE_BASE path
+
+# Run the full SSS calculation pipeline
+source("sss_production/src/2026/analysis/final_sss_calculations.R")
+```
+
+### 2. What to Expect
+
+The solver will run automatically when `calculate_taxes.R` is sourced. You should see:
+
+```
+=== Starting Iterative Solver ===
+Initial starting_income range: $X - $Y
+Max iterations: 100
+Tolerance: $ 1
+
+Iteration   1: 0/719 converged (0.0%)
+Iteration  10: 450/719 converged (62.6%)
+Iteration  20: 710/719 converged (98.7%)
+
+✓ All rows converged at iteration 23
+
+=== Convergence Summary ===
+Total rows: 719
+Converged: 719
+Non-converged: 0
+Convergence rate: 100.00%
+Avg iterations (converged): 18.5
+Min iterations: 3
+Max iterations: 23
+===========================
+```
+
+### 3. Verify Results
+
+After the pipeline completes, check the results:
+
+```r
+# View starting income distribution
+summary(calculations_df$starting_income)
+
+# Check convergence
+table(calculations_df$converged)
+
+# View iteration statistics
+summary(calculations_df$iteration_count)
+
+# Check for non-converged rows
+non_converged <- calculations_df[!calculations_df$converged, ]
+nrow(non_converged)  # Should be 0 or very few
+
+# View sample results
+calculations_df %>%
+  select(family_type, countyname, starting_income, iteration_count, converged) %>%
+  head(20)
+```
+
+### 4. Debug Mode
+
+If you encounter issues, enable debug mode in `calculate_taxes.R`:
+
+```r
+# In calculate_taxes.R, change line 20:
+debug = TRUE  # Shows detailed iteration progress
+```
+
+This will print:
+- Iteration progress every iterations
+- Non-converged row details
+- Income ranges and convergence statistics
+
+### 5. Troubleshooting
+
+**If you get "Cannot find tax_functions.R" error:**
+- Check that `SSS_CODE_BASE` environment variable is set
+- Verify path: `Sys.getenv("SSS_CODE_BASE")`
+- Ensure `sss_production` repository exists at that location
+
+**If convergence rate is low (<99%):**
+- Check input data for anomalies (negative costs, missing values)
+- Review non-converged rows for patterns
+- Consider increasing max_iterations or adjusting tolerance
+
+**If processing is slow:**
+- Disable debug mode (`debug = FALSE`)
+- Check data size (should be ~719 rows per county)
+- Ensure you're processing one county at a time
 
 ### Run Tests
 
