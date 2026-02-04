@@ -39,97 +39,46 @@ git clone https://github.com/Center-for-Women-s-Welfare/sss_tax_calculation.git
 cd sss_tax_calculation
 ```
 
-## Quick Start
+## Usage
+
+### In calculate_taxes.R
+
+The solver is integrated into the SSS production pipeline:
 
 ```r
-library(SSSTax)
+# In sss_production/src/2026/analysis/calculate_taxes.R
 
-# Load your basic needs data
-basic_needs <- read.csv("county_basic_needs.csv")
+# Source the iterative solver
+source(file.path(sss_code_base(), "sss_tax_calculation", "src", "calculations", "iterative_income_solver.R"))
 
-# Calculate starting income (federal taxes only in Phase 1)
-# Note: 'state' parameter is optional and not currently used in Phase 1
-result <- calculate_sss_income(
-  basic_needs_df = basic_needs,
-  year = 2026
-)
-
-# View results
-head(result[, c("family_type", "countyname", "calculated_starting_income")])
-```
-
-## Usage Examples
-
-### Basic Calculation
-
-```r
-# Process a single county's data
-result <- calculate_sss_income(
-  basic_needs_df = iowa_county_data,
-  year = 2026
+# Call the solver (loads tax params from CSV automatically)
+calculations_df <- solve_starting_income_iterative(
+  df = calculations_df,
+  year = sss_year,
+  state = state,  # For Phase 2 compatibility
+  max_iterations = 100,
+  tolerance = 1.0,
+  debug = TRUE  # Set to FALSE for production
 )
 ```
 
-### Processing Multiple Counties
+### Function Signature
 
 ```r
-# Split by county and process
-counties <- split(state_data, state_data$countyname)
-
-results <- lapply(counties, function(county_df) {
-  calculate_sss_income(county_df, year = 2026)
-})
-
-# Combine results
-final_results <- do.call(rbind, results)
-```
-
-### Debug Mode
-
-```r
-# Enable detailed diagnostic output
-result <- calculate_sss_income(
-  basic_needs_df = problem_data,
-  year = 2026,
-  debug = TRUE
-)
-
-# Check convergence
-non_converged <- result[!result$converged, ]
-print(non_converged[, c("family_type", "iteration_count")])
-```
-
-### Custom Parameters
-
-```r
-# Adjust convergence settings
-result <- calculate_sss_income(
-  basic_needs_df = basic_needs,
-  year = 2026,
-  tolerance = 0.5,        # $0.50 tolerance
-  max_iterations = 150    # Allow more iterations
+solve_starting_income_iterative(
+  df,                    # Required: Dataframe with basic needs data
+  year,                  # Required: Tax year (e.g., 2026)
+  state = NULL,          # Optional: State code (for Phase 2)
+  max_iterations = 100,  # Optional: Max iterations before fallback
+  tolerance = 1.0,       # Optional: Convergence tolerance in dollars
+  debug = FALSE          # Optional: Enable detailed output
 )
 ```
 
-## Function Parameters
-
-The main function signature is:
-
-```r
-calculate_sss_income(
-  basic_needs_df,           # Required: Input dataframe with 58 required columns
-  year,                     # Required: Tax year (e.g., 2026)
-  state = NULL,             # Optional: State code - NOT CURRENTLY USED in Phase 1
-  max_iterations = 100,     # Optional: Maximum solver iterations
-  tolerance = 1.0,          # Optional: Convergence tolerance in dollars
-  debug = FALSE             # Optional: Enable detailed diagnostic output
-)
-```
-
-**Important Note about the `state` Parameter:**
-- **Phase 1 (Current)**: The `state` parameter is included in the function signature for backward compatibility but is **not currently used**. All calculations are federal-only.
-- **Phase 2 (Future)**: The `state` parameter will be required when state tax calculations are implemented.
-- **Recommendation**: You can safely omit the `state` parameter in Phase 1, or include it for future-proofing your code.
+**Key Changes from Original Design:**
+- Tax parameters are **loaded automatically** from `src/data/federal/{year}/` CSV files
+- No need to pass `tax_params` parameter
+- Simpler function signature
 
 ## Input Requirements
 
@@ -164,57 +113,106 @@ Your `basic_needs_df` must include:
 
 ## Output Schema
 
-Returns input dataframe with **18 additional columns**:
+The solver returns the input dataframe with many additional columns. Here are the key columns to check:
 
-**Federal Payroll Taxes:**
-- `ss_tax`: Social Security tax
-- `medicare_tax`: Medicare tax
-- `total_fed_payroll_tax`: Total federal payroll taxes
+### Convergence Metadata
+- `starting_income`: **Converged annual gross income** needed for self-sufficiency
+- `iteration_count`: Number of iterations required to reach convergence
+- `converged`: TRUE if converged within tolerance, FALSE if fallback was used
+- `final_income_diff`: **Absolute income difference in final iteration** - shows how close non-converged rows were to convergence (in dollars)
 
-**Federal Income Tax:**
-- `total_fed_deductions`: Total federal deductions
-- `taxable_income`: Federal taxable income
-- `federal_income_tax`: Federal income tax liability
+### Federal Payroll Taxes
+- `ss_tax`: Social Security tax amount
+- `medicare_tax`: Medicare tax amount (includes additional Medicare tax if applicable)
+- `total_fed_payroll_tax`: **Total federal payroll taxes**
 
-**Federal Tax Credits:**
-- `eitc_credit`: Earned Income Tax Credit
-- `cdctc_credit`: Child and Dependent Care Credit
-- `ctc_credit`: Child Tax Credit (total)
+### Federal Income Tax
+- `fed_sd`: Federal standard deduction amount
+- `taxable_income`: Federal taxable income after deductions
+- `federal_cumulative_tax`: **Federal income tax before credits**
+
+### Federal Tax Credits
+- `eitc_credit`: **Earned Income Tax Credit amount**
+- `cdctc_credit`: **Child and Dependent Care Tax Credit amount**
+- `ctc_credit`: **Child Tax Credit amount** (total)
 - `ctc_nonrefundable`: Non-refundable CTC portion
 - `ctc_refundable`: Refundable CTC portion
 
-**Calculation Results:**
-- `starting_income`: Calculated annual gross income needed
-- `iteration_count`: Number of iterations to convergence
-- `converged`: TRUE if converged, FALSE if fallback used
+### Final Tax Calculations
+- `final_federal_income_tax`: **Final federal income tax owed** (after all credits, never negative)
+- `total_taxes`: Total federal taxes (payroll + income)
+- `total_credits`: Total federal credits (EITC + CDCTC + CTC)
+
+### Key Columns to Verify
+
+After running the solver, check these columns:
+
+```r
+# 1. Check convergence success
+table(result$converged)  # Should be mostly TRUE
+summary(result$iteration_count)  # Should average 15-25 iterations
+
+# 2. For non-converged rows, check how close they were
+non_converged <- result[!result$converged, ]
+if (nrow(non_converged) > 0) {
+  summary(non_converged$final_income_diff)  # Shows convergence distance in dollars
+  hist(non_converged$final_income_diff, 
+       main = "Income Difference for Non-Converged Rows",
+       xlab = "Final Income Difference ($)")
+}
+
+# 3. Check starting income is reasonable
+summary(result$starting_income)  # Should be positive
+range(result$starting_income)  # Should be $20k-$300k range
+
+# 3. Verify convergence formula holds
+result %>%
+  mutate(
+    expected_income = (subtotal2 * 12) + total_taxes - total_credits,
+    diff = abs(starting_income - expected_income)
+  ) %>%
+  filter(converged) %>%
+  summary(diff)  # Should be < $1 for converged rows
+
+# 4. Check tax components
+summary(result$total_fed_payroll_tax)  # Should be positive
+summary(result$federal_cumulative_tax)  # Should be >= 0
+summary(result$eitc_credit)  # Should be >= 0
+summary(result$cdctc_credit)  # Should be >= 0
+summary(result$ctc_credit)  # Should be >= 0
+
+# 5. View sample results by family type
+result %>%
+  select(family_type, countyname, starting_income, total_taxes, total_credits, 
+         iteration_count, converged, final_income_diff) %>%
+  head(20)
+```
 
 ## Repository Structure
 
 ```
-sss_tax_calculations/
+sss_tax_calculation/
 ├── src/
-│   ├── data/
-│   │   └── federal/              # Federal tax parameters by year
-│   │       └── 2026/
-│   │           ├── tax_fed_credits_df.csv
-│   │           ├── tax_fed_income_brackets_df.csv
-│   │           ├── tax_fed_payroll_df.csv
-│   │           └── tax_fed_sd_df.csv
+
 │   ├── calculations/
-│   │   ├── tax_calculation.R     # Main entry point
-│   │   ├── federal_taxes.R       # Federal tax components
-│   │   └── iterative_solver.R    # Convergence logic
+│   │   └── iterative_income_solver.R    # Main iterative solver
 │   └── utils/
-│       ├── data_validation.R     # Input validation
-│       ├── data_loader.R         # Load tax parameters
-│       └── helpers.R             # Utility functions
-├── tests/                         # Test suite
-│   ├── test_tax_calculation.R
-│   ├── test_federal_taxes.R
-│   ├── test_iterative_solver.R
-│   └── test_validation.R
-├── LLD.md                        # Low-Level Design document
-└── README.md                     # This file
+│       ├── diagnostics.R                 # Convergence diagnostics
+│       ├── validation.R                  # Input validation
+│       ├── tax_functions.R               # Tax calculation helpers
+│       └── data_loader.R                 # CSV data loading
+│── data/
+│       └── federal/                      # Federal tax parameters by year
+|       └── 2026/
+|       ├── tax_fed_credits_df.csv
+|       ├── tax_fed_income_brackets_df.csv
+|       ├── tax_fed_payroll_df.csv
+|       └── tax_fed_sd_df.csv
+├── tests/                                 # Test suite (if needed)
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasks.md
+└── README.md                              # This file
 ```
 
 ## Algorithm Overview
@@ -239,6 +237,100 @@ The engine uses an iterative solver to handle the recursive nature of tax calcul
 - **Success Rate**: >99.9% convergence in testing
 
 ## Testing
+
+The solver is now integrated into the main SSS pipeline. To test it:
+
+### 1. Run the Full Pipeline
+
+```r
+# Set your working directory
+setwd("<path to SSS_CODE_BASE>")  # Or your SSS_CODE_BASE path
+
+# Run the full SSS calculation pipeline
+source("sss_production/src/2026/analysis/final_sss_calculations.R")
+```
+
+### 2. What to Expect
+
+The solver will run automatically when `calculate_taxes.R` is sourced. You should see:
+
+```
+=== Starting Iterative Solver ===
+Initial starting_income range: $X - $Y
+Max iterations: 100
+Tolerance: $ 1
+
+Iteration   1: 0/719 converged (0.0%)
+Iteration  10: 450/719 converged (62.6%)
+Iteration  20: 710/719 converged (98.7%)
+
+✓ All rows converged at iteration 23
+
+=== Convergence Summary ===
+Total rows: 719
+Converged: 719
+Non-converged: 0
+Convergence rate: 100.00%
+Avg iterations (converged): 18.5
+Min iterations: 3
+Max iterations: 23
+===========================
+```
+
+### 3. Verify Results
+
+After the pipeline completes, check the results:
+
+```r
+# View starting income distribution
+summary(calculations_df$starting_income)
+
+# Check convergence
+table(calculations_df$converged)
+
+# View iteration statistics
+summary(calculations_df$iteration_count)
+
+# Check for non-converged rows
+non_converged <- calculations_df[!calculations_df$converged, ]
+nrow(non_converged)  # Should be 0 or very few
+
+# View sample results
+calculations_df %>%
+  select(family_type, countyname, starting_income, iteration_count, converged) %>%
+  head(20)
+```
+
+### 4. Debug Mode
+
+If you encounter issues, enable debug mode in `calculate_taxes.R`:
+
+```r
+# In calculate_taxes.R, change line 20:
+debug = TRUE  # Shows detailed iteration progress
+```
+
+This will print:
+- Iteration progress every iterations
+- Non-converged row details
+- Income ranges and convergence statistics
+
+### 5. Troubleshooting
+
+**If you get "Cannot find tax_functions.R" error:**
+- Check that `SSS_CODE_BASE` environment variable is set
+- Verify path: `Sys.getenv("SSS_CODE_BASE")`
+- Ensure `sss_production` repository exists at that location
+
+**If convergence rate is low (<99%):**
+- Check input data for anomalies (negative costs, missing values)
+- Review non-converged rows for patterns
+- Consider increasing max_iterations or adjusting tolerance
+
+**If processing is slow:**
+- Disable debug mode (`debug = FALSE`)
+- Check data size (should be ~719 rows per county)
+- Ensure you're processing one county at a time
 
 ### Run Tests
 
