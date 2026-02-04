@@ -39,44 +39,46 @@ git clone https://github.com/Center-for-Women-s-Welfare/sss_tax_calculation.git
 cd sss_tax_calculation
 ```
 
-## Quick Start
+## Usage
+
+### In calculate_taxes.R
+
+The solver is integrated into the SSS production pipeline:
 
 ```r
-library(SSSTax)
+# In sss_production/src/2026/analysis/calculate_taxes.R
 
-# Load your basic needs data
-basic_needs <- read.csv("county_basic_needs.csv")
+# Source the iterative solver
+source(file.path(sss_code_base(), "sss_tax_calculation", "src", "calculations", "iterative_income_solver.R"))
 
-# Calculate starting income (federal taxes only in Phase 1)
-# Note: 'state' parameter is optional and not currently used in Phase 1
-result <- calculate_sss_income(
-  basic_needs_df = basic_needs,
-  year = 2026
-)
-
-# View results
-head(result[, c("family_type", "countyname", "calculated_starting_income")])
-```
-
-
-## Function Parameters
-
-The main function signature is:
-
-```r
-calculate_sss_income(
-  basic_needs_df,           # Required: Input dataframe with 58 required columns
-  year,                     # Required: Tax year (e.g., 2026),
-  tax_params,               # tax params
-  max_iterations = 100,     # Optional: Maximum solver iterations
-  tolerance = 1.0,          # Optional: Convergence tolerance in dollars
-  debug = FALSE             # Optional: Enable detailed diagnostic output
+# Call the solver (loads tax params from CSV automatically)
+calculations_df <- solve_starting_income_iterative(
+  df = calculations_df,
+  year = sss_year,
+  state = state,  # For Phase 2 compatibility
+  max_iterations = 100,
+  tolerance = 1.0,
+  debug = TRUE  # Set to FALSE for production
 )
 ```
 
-**Important Note about the `state` Parameter:**
-- **Phase 1 (Current)**: The `state` parameter can be included in the function signature for backward compatibility but is **not currently used**. All calculations are federal-only.
-- **Phase 2 (Future)**: The `state` parameter will be required when state tax calculations are implemented.
+### Function Signature
+
+```r
+solve_starting_income_iterative(
+  df,                    # Required: Dataframe with basic needs data
+  year,                  # Required: Tax year (e.g., 2026)
+  state = NULL,          # Optional: State code (for Phase 2)
+  max_iterations = 100,  # Optional: Max iterations before fallback
+  tolerance = 1.0,       # Optional: Convergence tolerance in dollars
+  debug = FALSE          # Optional: Enable detailed output
+)
+```
+
+**Key Changes from Original Design:**
+- Tax parameters are **loaded automatically** from `src/data/federal/{year}/` CSV files
+- No need to pass `tax_params` parameter
+- Simpler function signature
 
 ## Input Requirements
 
@@ -189,27 +191,28 @@ result %>%
 ## Repository Structure
 
 ```
-sss_tax_calculations/
+sss_tax_calculation/
 ├── src/
 │   ├── data/
-│   │   └── federal/              # Federal tax parameters by year
+│   │   └── federal/                      # Federal tax parameters by year
 │   │       └── 2026/
 │   │           ├── tax_fed_credits_df.csv
 │   │           ├── tax_fed_income_brackets_df.csv
 │   │           ├── tax_fed_payroll_df.csv
 │   │           └── tax_fed_sd_df.csv
 │   ├── calculations/
-│   │   └── iterative_income_solver.R    # Convergence logic
+│   │   └── iterative_income_solver.R    # Main iterative solver
 │   └── utils/
-│       └── diagnostics.R         # Utility functions
-|       └── validation.R          
-├── tests/                         # Test suite
-│   ├── test_tax_calculation.R
-│   ├── test_federal_taxes.R
-│   ├── test_iterative_solver.R
-│   └── test_validation.R
-├── LLD.md                        # Low-Level Design document
-└── README.md                     # This file
+│       ├── diagnostics.R                 # Convergence diagnostics
+│       ├── validation.R                  # Input validation
+│       ├── tax_functions.R               # Tax calculation helpers
+│       └── data_loader.R                 # CSV data loading
+├── tests/                                 # Test suite (if needed)
+├── .kiro/specs/sss-tax-calculation-engine/  # Spec files
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasks.md
+└── README.md                              # This file
 ```
 
 ## Algorithm Overview
