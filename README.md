@@ -208,7 +208,6 @@ sss_tax_calculation/
 │       ├── tax_functions.R               # Tax calculation helpers
 │       └── data_loader.R                 # CSV data loading
 ├── tests/                                 # Test suite (if needed)
-├── .kiro/specs/sss-tax-calculation-engine/  # Spec files
 │   ├── requirements.md
 │   ├── design.md
 │   └── tasks.md
