@@ -111,29 +111,80 @@ Your `basic_needs_df` must include:
 
 ## Output Schema
 
-Returns input dataframe with **18 additional columns**:
+The solver returns the input dataframe with many additional columns. Here are the key columns to check:
 
-**Federal Payroll Taxes:**
-- `ss_tax`: Social Security tax
-- `medicare_tax`: Medicare tax
-- `total_fed_payroll_tax`: Total federal payroll taxes
+### Convergence Metadata
+- `starting_income`: **Converged annual gross income** needed for self-sufficiency
+- `iteration_count`: Number of iterations required to reach convergence
+- `converged`: TRUE if converged within tolerance, FALSE if fallback was used
+- `final_income_diff`: **Absolute income difference in final iteration** - shows how close non-converged rows were to convergence (in dollars)
 
-**Federal Income Tax:**
-- `total_fed_deductions`: Total federal deductions
-- `taxable_income`: Federal taxable income
-- `federal_income_tax`: Federal income tax liability
+### Federal Payroll Taxes
+- `ss_tax`: Social Security tax amount
+- `medicare_tax`: Medicare tax amount (includes additional Medicare tax if applicable)
+- `total_fed_payroll_tax`: **Total federal payroll taxes**
 
-**Federal Tax Credits:**
-- `eitc_credit`: Earned Income Tax Credit
-- `cdctc_credit`: Child and Dependent Care Credit
-- `ctc_credit`: Child Tax Credit (total)
+### Federal Income Tax
+- `fed_sd`: Federal standard deduction amount
+- `taxable_income`: Federal taxable income after deductions
+- `federal_cumulative_tax`: **Federal income tax before credits**
+
+### Federal Tax Credits
+- `eitc_credit`: **Earned Income Tax Credit amount**
+- `cdctc_credit`: **Child and Dependent Care Tax Credit amount**
+- `ctc_credit`: **Child Tax Credit amount** (total)
 - `ctc_nonrefundable`: Non-refundable CTC portion
 - `ctc_refundable`: Refundable CTC portion
 
-**Calculation Results:**
-- `starting_income`: Calculated annual gross income needed
-- `iteration_count`: Number of iterations to convergence
-- `converged`: TRUE if converged, FALSE if fallback used
+### Final Tax Calculations
+- `final_federal_income_tax`: **Final federal income tax owed** (after all credits, never negative)
+- `total_taxes`: Total federal taxes (payroll + income)
+- `total_credits`: Total federal credits (EITC + CDCTC + CTC)
+
+### Key Columns to Verify
+
+After running the solver, check these columns:
+
+```r
+# 1. Check convergence success
+table(result$converged)  # Should be mostly TRUE
+summary(result$iteration_count)  # Should average 15-25 iterations
+
+# 2. For non-converged rows, check how close they were
+non_converged <- result[!result$converged, ]
+if (nrow(non_converged) > 0) {
+  summary(non_converged$final_income_diff)  # Shows convergence distance in dollars
+  hist(non_converged$final_income_diff, 
+       main = "Income Difference for Non-Converged Rows",
+       xlab = "Final Income Difference ($)")
+}
+
+# 3. Check starting income is reasonable
+summary(result$starting_income)  # Should be positive
+range(result$starting_income)  # Should be $20k-$300k range
+
+# 3. Verify convergence formula holds
+result %>%
+  mutate(
+    expected_income = (subtotal2 * 12) + total_taxes - total_credits,
+    diff = abs(starting_income - expected_income)
+  ) %>%
+  filter(converged) %>%
+  summary(diff)  # Should be < $1 for converged rows
+
+# 4. Check tax components
+summary(result$total_fed_payroll_tax)  # Should be positive
+summary(result$federal_cumulative_tax)  # Should be >= 0
+summary(result$eitc_credit)  # Should be >= 0
+summary(result$cdctc_credit)  # Should be >= 0
+summary(result$ctc_credit)  # Should be >= 0
+
+# 5. View sample results by family type
+result %>%
+  select(family_type, countyname, starting_income, total_taxes, total_credits, 
+         iteration_count, converged, final_income_diff) %>%
+  head(20)
+```
 
 ## Repository Structure
 

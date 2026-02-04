@@ -86,7 +86,8 @@ solve_starting_income_iterative <- function(df,
     # ==== FEDERAL PAYROLL TAX ====
     df <- calculate_federal_payroll_taxes(
       calculations_df = df,
-      tax_fed_payroll_df = tax_params$fed_payroll
+      tax_fed_payroll_df = tax_params$fed_payroll,
+      year = year
     )
     
     # ==== FEDERAL INCOME TAX ====
@@ -122,6 +123,9 @@ solve_starting_income_iterative <- function(df,
     # ==== Check Convergence ====
     df$income_diff <- abs(df$new_starting_income - df$previous_income)
     df$row_converged <- df$income_diff < tolerance
+    
+    # Store final income diff for non-converged rows
+    df$final_income_diff <- df$income_diff
     
     df$starting_income <- df$new_starting_income
     df$iteration_count <- ifelse(df$converged, df$iteration_count, iter)
@@ -159,7 +163,7 @@ solve_starting_income_iterative <- function(df,
   df <- calculate_final_federal_income_tax(df)
   
   # Clean up temporary iteration variables only
-  # Keep all calculated values and parameters for downstream use
+  # Keep final_income_diff to show convergence distance
   df <- df %>%
     select(-any_of(c("previous_income", "new_starting_income", "income_diff", "row_converged")))
   
