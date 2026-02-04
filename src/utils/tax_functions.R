@@ -3,6 +3,23 @@
 
 library(dplyr)
 
+# ============================================================================
+# SHARED TAX HELPERS
+# ============================================================================
+
+#' Calculate Tax from Progressive Brackets
+#'
+#' Calculates income tax using progressive tax brackets. For each bracket,
+#' calculates the tax on the portion of income that falls within that bracket,
+#' then sums across all applicable brackets.
+#'
+#' @param df Dataframe with taxable income and filing status
+#' @param brackets_df Dataframe with tax brackets (filing_status, lower_limit, upper_limit, rate)
+#' @param taxable_income_var Column name for taxable income (default: "taxable_income")
+#' @param filing_status_var Column name for filing status (default: "filing_status")
+#' @param output_col Column name for output tax (default: "income_tax")
+#' @param local_income_tax_var Optional column name for local tax rate to add to bracket rates
+#' @return Dataframe with calculated tax column added
 calculate_tax_from_brackets <- function(df, brackets_df, 
                                         taxable_income_var = "taxable_income", 
                                         filing_status_var = "filing_status",
