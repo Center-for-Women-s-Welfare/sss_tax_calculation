@@ -8,17 +8,20 @@ library(tidyr)
 source(file.path(sss_code_path(repo = "sss_tax_calculation"), "src", "utils", "validation.R"))
 source(file.path(sss_code_path(repo = "sss_tax_calculation"), "src", "utils", "diagnostics.R"))
 source(file.path(sss_code_path(repo = "sss_tax_calculation"), "src", "utils", "tax_functions.R"))
+source(file.path(sss_code_path(repo = "sss_tax_calculation"), "src", "utils", "data_loader.R"))
 
 solve_starting_income_iterative <- function(df, 
                                             year,
                                             state = NULL,  
-                                            tax_params,
                                             max_iterations = 100,
                                             tolerance = 1.0,
                                             debug = FALSE) {
   
   # Validate input
   validate_input(df)
+  
+  # Load federal tax parameters from CSV files
+  tax_params <- load_federal_tax_params(year)
   
   # Prepare tax parameters
   credit_params <- tax_params$fed_credits %>%
