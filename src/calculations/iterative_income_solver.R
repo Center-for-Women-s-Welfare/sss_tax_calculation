@@ -7,9 +7,11 @@ library(tidyr)
 # Load utilities
 source(file.path(sss_code_path(repo = "sss_tax_calculation"), "src", "utils", "validation.R"))
 source(file.path(sss_code_path(repo = "sss_tax_calculation"), "src", "utils", "diagnostics.R"))
+source(file.path(sss_code_path(repo = "sss_tax_calculation"), "src", "utils", "tax_functions.R"))
 
 solve_starting_income_iterative <- function(df, 
-                                            year, 
+                                            year,
+                                            state = NULL,  
                                             tax_params,
                                             max_iterations = 100,
                                             tolerance = 1.0,
@@ -18,9 +20,7 @@ solve_starting_income_iterative <- function(df,
   # Validate input
   validate_input(df)
   
-  # Source existing tax functions
-  source(file.path(sss_code_path(), "src", "2026", "analysis", "tax_functions.R"))
-  
+  # Prepare tax parameters
   credit_params <- tax_params$fed_credits %>%
     filter(year == !!year)
   
@@ -37,61 +37,17 @@ solve_starting_income_iterative <- function(df,
     filter(year == !!year) %>%
     select(-year)
   
-  # Build EITC lookup ONCE
-  eitc_lookup_df <- expand.grid(
-    eitc_children = 0:2,
-    household_type = c("single_parent", "single_adult", "married"),
-    stringsAsFactors = FALSE
-  ) %>%
-    mutate(
-      filing_status = if_else(household_type == "married", "married", "single")
-    ) %>%
-    left_join(
-      eitc_params %>% filter(variable == "max_credit") %>% select(num_children, value),
-      by = c("eitc_children" = "num_children")
-    ) %>% rename(eitc_max = value) %>%
-    left_join(
-      eitc_params %>% filter(variable == "phase_in_rate") %>% select(num_children, value),
-      by = c("eitc_children" = "num_children")
-    ) %>% rename(eitc_phase_in_rate = value) %>%
-    left_join(
-      eitc_params %>% filter(variable == "phase_out_rate") %>% select(num_children, value),
-      by = c("eitc_children" = "num_children")
-    ) %>% rename(eitc_phase_out_rate = value) %>%
-    left_join(
-      eitc_params %>% filter(variable == "income_at_max") %>% select(num_children, value),
-      by = c("eitc_children" = "num_children")
-    ) %>% rename(eitc_income_at_max = value) %>%
-    left_join(
-      eitc_params %>% filter(variable == "phase_out_start") %>% select(num_children, filing_status, value),
-      by = c("eitc_children" = "num_children", "filing_status")
-    ) %>% rename(eitc_phase_out_start = value) %>%
-    left_join(
-      eitc_params %>% filter(variable == "phase_out_end") %>% select(num_children, filing_status, value),
-      by = c("eitc_children" = "num_children", "filing_status")
-    ) %>% rename(eitc_phase_out_end = value)
-  
-  # Extract CDCTC parameters ONCE
-  cdctc_lowest_bracket <- cdctc_params$value[cdctc_params$variable == "lowest_bracket"]
-  cdctc_bracket_interval <- cdctc_params$value[cdctc_params$variable == "bracket_interval"]
-  cdctc_top_bracket_amount <- cdctc_params$value[cdctc_params$variable == "top_bracket_amount"]
-  cdctc_rate_interval <- cdctc_params$value[cdctc_params$variable == "rate_interval"]
-  cdctc_lowest_rate <- cdctc_params$value[cdctc_params$variable == "lowest_rate"]
-  cdctc_highest_rate <- cdctc_params$value[cdctc_params$variable == "highest_rate"]
-  cdctc_max_credit_one_child <- cdctc_params %>% filter(num_children == 1, variable == "max_credit") %>% pull(value)
-  cdctc_max_credit_two_children <- cdctc_params %>% filter(num_children == 2, variable == "max_credit") %>% pull(value)
-  
-  # Extract CTC parameters ONCE
-  ctc_percentage <- ctc_params %>% filter(variable == "percentage") %>% pull(value)
-  ctc_min_earning_threshold <- ctc_params %>% filter(variable == "min_earning_threshold") %>% pull(value)
-  ctc_max_credit <- ctc_params %>% filter(variable == "max_per_child") %>% pull(value)
+  # Build EITC lookup and extract credit parameters
+  eitc_lookup_df <- build_eitc_lookup(eitc_params)
+  cdctc_params_list <- extract_cdctc_params(cdctc_params)
+  ctc_params_list <- extract_ctc_params(ctc_params)
   
   # Initialize
   df$starting_income <- df$subtotal3 * 1.20 * 12
   df$iteration_count <- 0
   df$converged <- FALSE
   
-  # Join EITC lookup ONCE before loop (parameters don't change)
+  # Join EITC lookup ONCE before loop
   df <- df %>%
     mutate(eitc_children = pmin(children, 2)) %>%
     left_join(eitc_lookup_df, by = c("eitc_children", "household_type"), relationship = "many-to-one")
@@ -131,18 +87,7 @@ solve_starting_income_iterative <- function(df,
     )
     
     # ==== FEDERAL INCOME TAX ====
-    df <- df %>%
-      mutate(
-        fed_sd = case_when(
-          household_type == "married" ~ federal_standard_deduction$married,
-          household_type == "single_parent" ~ federal_standard_deduction$single_parent,
-          household_type == "single_adult" ~ federal_standard_deduction$single_adult
-        ),
-        esi_premium_deduction = health_ins_premium * 12,
-        total_fed_deductions = fed_sd + esi_premium_deduction,
-        taxable_income = pmax(starting_income - total_fed_deductions, 0),
-        filing_status = household_type
-      )
+    df <- calculate_federal_income_tax(df, federal_standard_deduction)
     
     df <- calculate_tax_from_brackets(
       df = df,
@@ -153,58 +98,13 @@ solve_starting_income_iterative <- function(df,
     )
     
     # ==== EITC ====
-    # EITC parameters already joined before loop, just calculate credit
-    df <- df %>%
-      mutate(
-        eitc_credit = case_when(
-          starting_income <= eitc_income_at_max ~ starting_income * eitc_phase_in_rate,
-          starting_income <= eitc_phase_out_start ~ eitc_max,
-          starting_income <= eitc_phase_out_end ~ pmax(eitc_max - (eitc_phase_out_rate * (starting_income - eitc_phase_out_start)), 0),
-          TRUE ~ 0
-        )
-      )
+    df <- calculate_eitc_credit(df)
     
     # ==== CDCTC ====
-    
-    df$cdctc_max <- ifelse(
-      df$children == 1,
-      cdctc_max_credit_one_child,
-      ifelse(df$children >= 2, cdctc_max_credit_two_children, 0)
-    )
-    
-    df <- df %>%
-      mutate(
-        cdctc_eligible_expense = pmin(child_care_cost * 12, cdctc_max),
-        cdctc_rate = case_when(
-          starting_income <= cdctc_lowest_bracket ~ cdctc_highest_rate,
-          starting_income >= cdctc_top_bracket_amount ~ cdctc_lowest_rate,
-          TRUE ~ round(cdctc_highest_rate - ((floor((starting_income - cdctc_lowest_bracket) / cdctc_bracket_interval)) * cdctc_rate_interval), 2)
-        ),
-        cdctc_estimate = cdctc_eligible_expense * cdctc_rate,
-        cdctc_credit = pmin(cdctc_estimate, federal_cumulative_tax)
-      )
+    df <- calculate_cdctc_credit(df, cdctc_params_list)
     
     # ==== CTC ====
-    df <- df %>%
-      mutate(
-        ctc_credit_base = children * ctc_max_credit,
-        federal_tax_after_cdctc = pmax(federal_cumulative_tax - cdctc_credit, 0),
-        ctc_nonrefundable = pmin(ctc_credit_base, federal_tax_after_cdctc),
-        ctc_income_based_refund = pmax(0, ctc_percentage * (starting_income - ctc_min_earning_threshold)),
-        ctc_refund_1to2_children = ifelse(
-          children <= 2,
-          pmin(ctc_credit_base - ctc_nonrefundable, ctc_income_based_refund),
-          0
-        ),
-        ctc_payroll_based_refund = pmax(0, total_fed_payroll_tax - eitc_credit),
-        ctc_refund_3plus_children = ifelse(
-          children >= 3,
-          pmin(ctc_credit_base - ctc_nonrefundable, ctc_payroll_based_refund),
-          0
-        ),
-        ctc_refundable = ctc_refund_1to2_children + ctc_refund_3plus_children,
-        ctc_credit = ctc_nonrefundable + ctc_refundable
-      )
+    df <- calculate_ctc_credit(df, ctc_params_list)
     
     # ==== Calculate Totals (Phase 1: Federal Only) ====
     df <- df %>%
@@ -253,23 +153,7 @@ solve_starting_income_iterative <- function(df,
   print_convergence_summary(df, debug)
   
   # ==== Calculate Final Federal Income Tax ====
-  df <- df %>%
-    mutate(
-      # Step 1: Apply nonrefundable CDCTC credit (capped at cumulative tax)
-      fed_nonrefundable_credit_applied = pmin(cdctc_credit, federal_cumulative_tax),
-      
-      # Step 2: Subtract nonrefundable credit
-      federal_tax_after_nonrefundable = pmax(federal_cumulative_tax - fed_nonrefundable_credit_applied, 0),
-      
-      # Step 3: Sum refundable CTC + EITC
-      federal_total_refundable_credits = ctc_refundable + eitc_credit,
-      
-      # Step 4: Subtract refundable credits
-      federal_tax_liability_with_refund = federal_tax_after_nonrefundable - federal_total_refundable_credits,
-      
-      # Step 5: Final tax owed (never negative)
-      final_federal_income_tax = pmax(federal_tax_liability_with_refund, 0)
-    )
+  df <- calculate_final_federal_income_tax(df)
   
   # Clean up temporary iteration variables only
   # Keep all calculated values and parameters for downstream use
