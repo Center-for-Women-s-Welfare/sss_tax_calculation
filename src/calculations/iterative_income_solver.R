@@ -162,7 +162,7 @@ solve_starting_income_iterative <- function(df,
   # ==== Calculate Final Federal Income Tax ====
   df <- calculate_final_federal_income_tax(df)
   
-  # Clean up temporary iteration variables only
+  # Clean up temporary iteration variables only.
   # Keep final_income_diff to show convergence distance
   df <- df %>%
     select(-any_of(c("previous_income", "new_starting_income", "income_diff", "row_converged")))
