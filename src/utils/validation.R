@@ -8,6 +8,10 @@
 #' @param df Input dataframe (calculations_df with basic needs)
 #' @return TRUE if valid, stops with error message if invalid
 validate_input <- function(df) {
+
+  if (!is.data.frame(df)) {
+    stop("Input must be a data frame, got: ", class(df))
+  }
   
   # Required columns for tax calculations
   required_cols <- c(
