@@ -3,6 +3,7 @@
 
 # testing package
 library(testthat)
+library(sssUtils)
 
 # function to be tested
 source(file.path(sss_code_path(repo = "sss_tax_calculation"), "src", "utils", "validation.R"))
@@ -13,7 +14,10 @@ create_mock_df <- function(nrows = 10) {
     subtotal2 = runif(nrows, min = 1000, max = 5000),
     subtotal3 = runif(nrows, min = 1500, max = 6000),
     household_type = sample(c('single_adult', 'single_parent', 'married'), nrows, replace = TRUE),
-    children = sample(0:3, nrows, min = 0, max = 1000),
+    children = sample(0:10, nrows, replace = TRUE),
+    adult = sample(1:5, nrows, replace = TRUE),
+    child_care_cost = runif(nrows, min = 0, max = 2000),
+    health_ins_premium = runif(nrows, min = 0, max = 3000),
     county_table_number = sample(1:50, nrows, replace = TRUE),
     stringsAsFactors = FALSE
   )
@@ -25,6 +29,13 @@ test_that("validate_input returns TRUE for valid input", {
   expect_true(validate_input(mock_df))
 })
 
+# Input validation tests
+test_that('input must be of type data frame', {
+  expect_error(validate_input(list()), "Input must be a data frame, got: list")
+  expect_error(validate_input(matrix()), "Input must be a data frame, got: matrix")
+  expect_error(validate_input("not a data frame"), "Input must be a data frame, got: character")
+})
+
 # Missing column tests
 test_that("validate_input detects missing column", {
   mock_df <- create_mock_df()
@@ -32,9 +43,7 @@ test_that("validate_input detects missing column", {
   # test if missing one column throws error
   missing_col_df <- mock_df[, -which(names(mock_df) == "subtotal2")]
   expect_error(validate_input(missing_col_df),
-               "Missing required column: subtotal2")
-  expect_error(validate_input(missing_col_df),
-               "Ensure basic needs calculations have been completed.")
+               "Missing required columns: subtotal2 \nEnsure basic needs calculations have been completed.")
 
   # test for multiple missing columns
   missing_cols_df <- mock_df[, -which(names(mock_df) %in% c("subtotal2", "household_type"))]
@@ -51,38 +60,27 @@ test_that("validate_input detects missing data", {
   # Missing subtotal2 values
   mock_df$subtotal2[1] <- NA
   expect_error(validate_input(mock_df),
-               "Column subtotal2 contains NA values.")
-  expect_error(validate_input(mock_df),
-               "Found 1 NA values out of 10 rows.")
+               "Column subtotal2 contains NA values. \nFound 1 NA values out of 10 rows.")
 
   # Missing household_type values
   mock_df <- create_mock_df()
   mock_df$household_type[c(2,4)] <- NA
   expect_error(validate_input(mock_df),
-               "Column household_type contains NA values.")
-  expect_error(validate_input(mock_df),
-                "Found 2 NA values out of 10 rows.")
+               "Column household_type contains NA values. \nFound 2 NA values out of 10 rows.")
 
   # Missing subtotal3 values
   mock_df <- create_mock_df()
   mock_df$subtotal3[c(3,5,7)] <- NA
   expect_error(validate_input(mock_df),
-               "Column subtotal3 contains NA values.")
-  expect_error(validate_input(mock_df),
-               "Found 3 NA values out of 10 rows.")
+               "Column subtotal3 contains NA values. \nFound 3 NA values out of 10 rows.")
 
   # Missing values in multiple columns
   mock_df <- create_mock_df()
   mock_df$subtotal2[c(1,6)] <- NA
   mock_df$household_type[c(2,4,5)] <- NA
+  # catches subtotal2 first and quits
   expect_error(validate_input(mock_df),
-               "Column subtotal2 contains NA values.")
-  expect_error(validate_input(mock_df),
-                "Found 2 NA values out of 10 rows.")
-  expect_error(validate_input(mock_df),
-                "Column household_type contains NA values.")
-  expect_error(validate_input(mock_df),
-                "Found 3 NA values out of 10 rows.")
+               "Column subtotal2 contains NA values. \nFound 2 NA values out of 10 rows.")
 })
 
 # Function will allow NAs in non-critical columns
@@ -94,7 +92,7 @@ test_that("validate_input allows NAs in non-critical columns", {
   expect_true(validate_input(mock_df))
 })
 
-test_that("validate_input detects negative values in subtotals"{
+test_that("validate_input detects negative values in subtotals", {
   # Negative value in subtotal2
   mock_df <- create_mock_df()
   mock_df$subtotal2[1] <- -100
@@ -118,17 +116,13 @@ test_that("validate_input detects invalid household_type values", {
   mock_df <- create_mock_df()
   mock_df$household_type[1] <- "invalid_type"
   expect_error(validate_input(mock_df),
-               "Invalid household_type values found: invalid_type.")
-  expect_error(validate_input(mock_df),
-               "Valid values are: single_adult, single_parent, married.")
+               "Invalid household_type values found: invalid_type \nValid values are: single_adult, single_parent, married")
 
   # Multiple invalid household_type values
   mock_df <- create_mock_df()
   mock_df$household_type[c(2,4)] <- c("foo", "bar")
   expect_error(validate_input(mock_df),
-               "Invalid household_type values found: foo, bar.")
-  expect_error(validate_input(mock_df),
-               "Valid values are: single_adult, single_parent, married.")
+               "Invalid household_type values found: foo, bar \nValid values are: single_adult, single_parent, married")
 })
 
 test_that("Valid household types raise no errors", {
@@ -151,9 +145,10 @@ test_that("Valid household types raise no errors", {
 test_that("validate_input detects empty data frame", {
   empty_mock <- create_mock_df(0)
   expect_error(validate_input(empty_mock),
-               "Input data frame is empty \\(0 rows\\)")
+               "Input dataframe is empty \\(0 rows\\)")
 })
 
+# warning: this takes a long time to run
 test_that("Warning is raised for large data frames", {
   large_mock <- create_mock_df(1)
   # replicate to speed up processing
@@ -176,6 +171,7 @@ test_that("Reasonably sized dataframes do not raise warnings", {
   expect_silent(validate_input(mock_df))
 })
 
+# also takes a long time to run
 test_that("Edge cases handled correctly", {
   # Data frame with exactly 1 row
   mock_df <- create_mock_df(1)
@@ -195,18 +191,9 @@ test_that("Numerous errors handled correctly", {
   mock_df$household_type[c(2,4,5)] <- NA
   mock_df$subtotal3[c(3,5,7)] <- -100
 
+  # catches the subtotal2 NA error first and quits
   expect_error(validate_input(mock_df),
-               "Column subtotal2 contains NA values.")
-  expect_error(validate_input(mock_df),
-                "Found 2 NA values out of 10 rows.")
-  expect_error(validate_input(mock_df),
-                "Column household_type contains NA values.")
-  expect_error(validate_input(mock_df),
-                "Found 3 NA values out of 10 rows.")
-  expect_error(validate_input(mock_df),
-               "subtotal3 contains negative values.")
-  expect_error(validate_input(mock_df),
-                "Found 3 negative values.")
+               "Column subtotal2 contains NA values. \nFound 2 NA values out of 10 rows.")
 })
 
 test_that("Order of errors are correct", {
@@ -215,7 +202,7 @@ test_that("Order of errors are correct", {
   df_no_subtotal2 <- mock_df[, -which(names(mock_df) == "subtotal2")]
   df_no_subtotal2$subtotal3[1] <- NA
   expect_error(validate_input(df_no_subtotal2),
-               "Missing required column: subtotal2")
+               "Missing required columns: subtotal2 \nEnsure basic needs calculations have been completed.")
 
   # NA detection before negative value detection
   mock_df <- create_mock_df()
