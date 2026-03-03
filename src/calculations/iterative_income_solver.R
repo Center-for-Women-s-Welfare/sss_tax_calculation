@@ -1,6 +1,7 @@
 # Iterative solver for SSS starting income calculation
 
 # Load required libraries
+library(sssUtils)
 library(dplyr)
 library(tidyr)
 
