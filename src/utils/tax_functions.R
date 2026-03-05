@@ -35,7 +35,8 @@ calculate_tax_from_brackets <- function(df, brackets_df,
       filing_status = .data[[filing_status_var]],
       local_income_tax_rate = if (!is.null(local_income_tax_var)) .data[[local_income_tax_var]] else 0
     ) %>%
-    left_join(brackets_df, by = "filing_status") %>%
+    # originally: left_join(brackets_df, by = c("filing_status")) %>%
+    left_join(brackets_df, by = "filing_status", relationship = "many-to-many") %>%
     filter(taxable_income > lower_limit) %>%
     mutate(
       taxable_at_bracket = pmin(taxable_income, upper_limit) - lower_limit,

@@ -14,7 +14,6 @@ load_federal_tax_params <- function(year) {
   # Build path to federal tax data directory
   fed_tax_dir <- file.path(
     sss_code_path(repo = "sss_tax_calculation"),
-    "src",
     "data",
     "federal",
     as.character(year)
