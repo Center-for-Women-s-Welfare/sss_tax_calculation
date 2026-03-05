@@ -41,12 +41,11 @@ cd sss_tax_calculation
 
 ## Usage
 
-### In calculate_taxes.R
-
-The solver is integrated into the SSS production pipeline:
+### In your R environment
 
 ```r
-# In sss_production/src/2026/analysis/calculate_taxes.R
+# Load required library
+library(sssUtils)
 
 # Source the iterative solver
 source(file.path(sss_code_base(), "sss_tax_calculation", "src", "calculations", "iterative_income_solver.R"))
@@ -76,7 +75,7 @@ solve_starting_income_iterative(
 ```
 
 **Key Changes from Original Design:**
-- Tax parameters are **loaded automatically** from `src/data/federal/{year}/` CSV files
+- Tax parameters are **loaded automatically** from `data/federal/{year}/` CSV files
 - No need to pass `tax_params` parameter
 - Simpler function signature
 
