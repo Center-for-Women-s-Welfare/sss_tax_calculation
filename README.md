@@ -432,6 +432,11 @@ The engine supports **719 family types** defined by:
 - `a2i0p0s2t0`: Married couple with 2 school-age children
 - `a2i1p1s1t1`: Married couple with 4 children (1 of each age group)
 
+## Quick Setup Instructions
+
+- This package is used by `sss_production`. 
+- For running the code in this package, use the guide defined [here](https://github.com/Center-for-Women-s-Welfare/sss_production/blob/main/README.md) 
+
 ## Contributing
 
 We welcome contributions! Please:
