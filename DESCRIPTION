@@ -1,0 +1,21 @@
+Package: sssTaxCalculation
+Title: SSS Tax Calculation Engine
+Version: 0.1.0
+Authors@R: c(
+    person("Alicia", "Chuang", email = "agchuang@uw.edu", role = c("aut", "cre")),
+    person("Harshil", "Shah", email = "harshil6@uw.edu", role = "aut"),
+    person("Mya", "Strayer", email = "myajean@uw.edu", role = "aut")
+  )
+Description: Given a basic needs dataframe as input, calculates corresponding
+    federal taxes, tax credits, and necessary gross income using an iterative
+    solver. Supports federal payroll taxes, income taxes, EITC, CDCTC, and CTC.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.0.0)
+Imports:
+    dplyr,
+    tidyr,
+    readr
