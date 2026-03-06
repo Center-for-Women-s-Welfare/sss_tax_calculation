@@ -30,7 +30,7 @@ The Self-Sufficiency Standard measures the income families need to meet basic ne
 
 ## Installation
 
-```r
+```bash
 # Install from GitHub
 devtools::install_github("Center-for-Women-s-Welfare/sss_tax_calculation")
 
@@ -237,75 +237,67 @@ The engine uses an iterative solver to handle the recursive nature of tax calcul
 
 ## Testing
 
-The solver is now integrated into the main SSS pipeline. To test it:
+To run the accompanying test files:
 
-### 1. Run the Full Pipeline
+### 1. Run the Associated Tests
 
 ```r
-# Set your working directory
-setwd("<path to SSS_CODE_BASE>")  # Or your SSS_CODE_BASE path
+# Navigate to tests file (should already be in sss_tax_calculation repo)
+cd ./tests
+```
 
-# Run the full SSS calculation pipeline
-source("sss_production/src/2026/analysis/final_sss_calculations.R")
+In R, open:
+- `test_validation.R` to run accompanying tests for the data validation function.
+- `test_iterative_income_solver.R` to run accompanying tests for the tax calculations.
+
+Or run the full file through terminal:
+
+```r
+# Run all tests
+devtools::test()
+
+# Run specific test file
+testthat::test_file("tests/test_validation.R")
 ```
 
 ### 2. What to Expect
 
-The solver will run automatically when `calculate_taxes.R` is sourced. You should see:
+The tests will print the convergence summary (when applicable) and the resulting status. You should see:
 
 ```
-=== Starting Iterative Solver ===
-Initial starting_income range: $X - $Y
-Max iterations: 100
-Tolerance: $ 1
-
-Iteration   1: 0/719 converged (0.0%)
-Iteration  10: 450/719 converged (62.6%)
-Iteration  20: 710/719 converged (98.7%)
-
-✓ All rows converged at iteration 23
-
 === Convergence Summary ===
-Total rows: 719
-Converged: 719
+Total rows: 10
+Converged: 10
 Non-converged: 0
-Convergence rate: 100.00%
-Avg iterations (converged): 18.5
+Convergence rate: 100.00% 
+Avg iterations (converged): 6.4
 Min iterations: 3
-Max iterations: 23
+Max iterations: 9 
 ===========================
+
+Test passed with X success(es) 😸.
 ```
+
+Some tests have multiple results, but all are similar kinds of tests. 
+Each testing block is separated by distinct calls, starting with test_that("..., {
+with a helpful description describing which logical clause is being tested.
 
 ### 3. Verify Results
 
-After the pipeline completes, check the results:
+As you run the tests, all should result in successes. If they are failing, make sure you have ran the required libraries and source lines.
 
-```r
-# View starting income distribution
-summary(calculations_df$starting_income)
-
-# Check convergence
-table(calculations_df$converged)
-
-# View iteration statistics
-summary(calculations_df$iteration_count)
-
-# Check for non-converged rows
-non_converged <- calculations_df[!calculations_df$converged, ]
-nrow(non_converged)  # Should be 0 or very few
-
-# View sample results
-calculations_df %>%
-  select(family_type, countyname, starting_income, iteration_count, converged) %>%
-  head(20)
-```
+Important things to keep in mind:
+- Tests are *hardcoded* to match the function. If you wish to change warning or error messages, make sure to update the tests to match.
+- A few of the tests verify behavior for incredibly large datasets. These take a long processing time, and should only be ran when necessary.
+- The mock data used for testing the tax calculator was pulled directly from the 2026 IA basic needs dataframe and may not be reflective of other datasets.
+- Tests are comprehensive for their accompanying functions (all primary logic is tested) but may not account for specific edge cases.
 
 ### 4. Debug Mode
 
-If you encounter issues, enable debug mode in `calculate_taxes.R`:
+If you encounter issues, you can enable debug mode within our tax calculator itself:
 
 ```r
-# In calculate_taxes.R, change line 20:
+# In iterative_income_solver.R, change line 19:
 debug = TRUE  # Shows detailed iteration progress
 ```
 
@@ -316,30 +308,19 @@ This will print:
 
 ### 5. Troubleshooting
 
-**If you get "Cannot find tax_functions.R" error:**
-- Check that `SSS_CODE_BASE` environment variable is set
-- Verify path: `Sys.getenv("SSS_CODE_BASE")`
-- Ensure `sss_production` repository exists at that location
+**If you get "`eval(code, test_env)`: object 'YEAR' not found" error:**
+- Make sure to run all code prior to the test_that() blocks
+- The YEAR parameter is hard-coded to 2026 to match current state repository
 
-**If convergence rate is low (<99%):**
+**If new data convergence rate is low (<99%):**
 - Check input data for anomalies (negative costs, missing values)
 - Review non-converged rows for patterns
 - Consider increasing max_iterations or adjusting tolerance
 
-**If processing is slow:**
+**If overall processing is slow:**
 - Disable debug mode (`debug = FALSE`)
 - Check data size (should be ~719 rows per county)
 - Ensure you're processing one county at a time
-
-### Run Tests
-
-```r
-# Run all tests
-devtools::test()
-
-# Run specific test file
-testthat::test_file("tests/test_federal_taxes.R")
-```
 
 ### Coverage Requirements
 
@@ -348,8 +329,8 @@ testthat::test_file("tests/test_federal_taxes.R")
 
 ### Test Categories
 
--  Unit tests for each tax component
--  Integration tests for full calculation flow
+-  Unit tests for convergent and non-convergent examples
+-  Data shape / structure and function stability tests for downstream integration
 -  Input validation tests
 
 ## Tax Parameter Updates
