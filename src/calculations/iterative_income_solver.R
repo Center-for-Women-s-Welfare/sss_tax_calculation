@@ -119,7 +119,7 @@ solve_starting_income_iterative <- function(df,
       )
     
     # ==== Calculate New Starting Income ====
-    df$new_starting_income <- (df$subtotal2 * 12) + df$total_taxes - df$total_credits
+    df$new_starting_income <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
     
     # ==== Check Convergence ====
     df$income_diff <- abs(df$new_starting_income - df$previous_income)
