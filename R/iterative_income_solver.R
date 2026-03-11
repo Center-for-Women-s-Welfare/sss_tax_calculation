@@ -1,16 +1,16 @@
-# Iterative solver for SSS starting income calculation
-#
-# Given a basic needs dataframe, iteratively solves for the gross annual income
-# required to cover those needs after accounting for federal taxes and credits.
-#
-# @param df Dataframe with basic needs columns (see validate_input for required columns)
-# @param year Tax year (e.g., 2026)
-# @param state State abbreviation (reserved for future state tax support)
-# @param max_iterations Maximum number of solver iterations (default: 100)
-# @param tolerance Convergence threshold in dollars (default: 1.0)
-# @param debug If TRUE, print iteration progress and diagnostics
-# @return Input dataframe with starting_income and tax breakdown columns added
-# @export
+#' Iterative solver for SSS starting income calculation
+#'
+#' Given a basic needs dataframe, iteratively solves for the gross annual income
+#' required to cover those needs after accounting for federal taxes and credits.
+#'
+#' @param df Dataframe with basic needs columns (see validate_input for required columns)
+#' @param year Tax year (e.g., 2026)
+#' @param state State abbreviation (reserved for future state tax support)
+#' @param max_iterations Maximum number of solver iterations (default: 100)
+#' @param tolerance Convergence threshold in dollars (default: 1.0)
+#' @param debug If TRUE, print iteration progress and diagnostics
+#' @return Input dataframe with starting_income and tax breakdown columns added
+#' @export
 solve_starting_income_iterative <- function(df,
                                             year,
                                             state = NULL,
