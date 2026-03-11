@@ -1,18 +1,16 @@
 # Iterative solver for SSS starting income calculation
-
-#' Solve for Starting Income Iteratively
-#'
-#' Given a basic needs dataframe, iteratively solves for the gross annual income
-#' required to cover those needs after accounting for federal taxes and credits.
-#'
-#' @param df Dataframe with basic needs columns (see validate_input for required columns)
-#' @param year Tax year (e.g., 2026)
-#' @param state State abbreviation (reserved for future state tax support)
-#' @param max_iterations Maximum number of solver iterations (default: 100)
-#' @param tolerance Convergence threshold in dollars (default: 1.0)
-#' @param debug If TRUE, print iteration progress and diagnostics
-#' @return Input dataframe with starting_income and tax breakdown columns added
-#' @export
+#
+# Given a basic needs dataframe, iteratively solves for the gross annual income
+# required to cover those needs after accounting for federal taxes and credits.
+#
+# @param df Dataframe with basic needs columns (see validate_input for required columns)
+# @param year Tax year (e.g., 2026)
+# @param state State abbreviation (reserved for future state tax support)
+# @param max_iterations Maximum number of solver iterations (default: 100)
+# @param tolerance Convergence threshold in dollars (default: 1.0)
+# @param debug If TRUE, print iteration progress and diagnostics
+# @return Input dataframe with starting_income and tax breakdown columns added
+# @export
 solve_starting_income_iterative <- function(df,
                                             year,
                                             state = NULL,
@@ -93,7 +91,7 @@ solve_starting_income_iterative <- function(df,
         total_credits = coalesce(eitc_credit, 0) + coalesce(cdctc_credit, 0) + coalesce(ctc_credit, 0)
       )
 
-    df$new_starting_income <- (df$subtotal2 * 12) + df$total_taxes - df$total_credits
+    df$new_starting_income <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
     df$income_diff         <- abs(df$new_starting_income - df$previous_income)
     df$row_converged       <- df$income_diff < tolerance
     df$final_income_diff   <- df$income_diff
