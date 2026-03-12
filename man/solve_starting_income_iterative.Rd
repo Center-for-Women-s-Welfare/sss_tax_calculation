@@ -14,7 +14,8 @@ solve_starting_income_iterative(
 )
 }
 \arguments{
-\item{df}{Dataframe with basic needs columns (see validate_input for required columns)}
+\item{df}{Dataframe with basic needs columns
+(see validate_input for required columns)}
 
 \item{year}{Tax year (e.g., 2026)}
 

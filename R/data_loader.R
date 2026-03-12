@@ -20,9 +20,9 @@ load_federal_tax_params <- function(year) {
   }
 
   list(
-    fed_payroll  = read_csv(file.path(fed_tax_dir, "tax_fed_payroll_df.csv"),  show_col_types = FALSE),
-    fed_credits  = read_csv(file.path(fed_tax_dir, "tax_fed_credits_df.csv"),  show_col_types = FALSE),
-    fed_brackets = read_csv(file.path(fed_tax_dir, "tax_fed_income_brackets_df.csv"), show_col_types = FALSE),
-    fed_sd       = read_csv(file.path(fed_tax_dir, "tax_fed_sd_df.csv"),       show_col_types = FALSE)
+    fed_payroll  = readr::read_csv(file.path(fed_tax_dir, "tax_fed_payroll_df.csv"),  show_col_types = FALSE),
+    fed_credits  = readr::read_csv(file.path(fed_tax_dir, "tax_fed_credits_df.csv"),  show_col_types = FALSE),
+    fed_brackets = readr::read_csv(file.path(fed_tax_dir, "tax_fed_income_brackets_df.csv"), show_col_types = FALSE),
+    fed_sd       = readr::read_csv(file.path(fed_tax_dir, "tax_fed_sd_df.csv"),       show_col_types = FALSE)
   )
 }

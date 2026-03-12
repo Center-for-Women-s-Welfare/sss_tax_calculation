@@ -3,7 +3,8 @@
 #' Given a basic needs dataframe, iteratively solves for the gross annual income
 #' required to cover those needs after accounting for federal taxes and credits.
 #'
-#' @param df Dataframe with basic needs columns (see validate_input for required columns)
+#' @param df Dataframe with basic needs columns 
+#' (see validate_input for required columns)
 #' @param year Tax year (e.g., 2026)
 #' @param state State abbreviation (reserved for future state tax support)
 #' @param max_iterations Maximum number of solver iterations (default: 100)
@@ -22,21 +23,27 @@ solve_starting_income_iterative <- function(df,
 
   tax_params <- load_federal_tax_params(year)
 
-  credit_params <- tax_params$fed_credits %>%
+  credit_params <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_credits_df.csv",
+                             package = "sssTaxCalculation"), show_col_types = FALSE) %>%
     filter(year == !!year)
 
-  eitc_params  <- credit_params %>% filter(credit == "eitc")
-  cdctc_params <- credit_params %>% filter(credit == "cdctc")
-  ctc_params   <- credit_params %>% filter(credit == "ctc")
+  eitc_params  <- credit_params %>% dplyr::filter(credit == "eitc")
+  cdctc_params <- credit_params %>% dplyr::filter(credit == "cdctc")
+  ctc_params   <- credit_params %>% dplyr::filter(credit == "ctc")
 
-  federal_standard_deduction <- tax_params$fed_sd %>%
+  federal_standard_deduction <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_sd_df.csv",
+                              package = "sssTaxCalculation"), show_col_types = FALSE) %>%
     filter(year == !!year) %>%
     select(-year) %>%
     pivot_wider(names_from = filing_status, values_from = deduction)
 
-  federal_tax_brackets <- tax_params$fed_brackets %>%
+  federal_tax_brackets <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_income_brackets_df.csv",
+                                       package = "sssTaxCalculation"), show_col_types = FALSE) %>%
     filter(year == !!year) %>%
     select(-year)
+
+  federal_payroll <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_payroll_df.csv",
+                                       package = "sssTaxCalculation"), show_col_types = FALSE)
 
   eitc_lookup_df    <- build_eitc_lookup(eitc_params)
   cdctc_params_list <- extract_cdctc_params(cdctc_params)
@@ -75,7 +82,7 @@ solve_starting_income_iterative <- function(df,
         "total_taxes", "total_credits", "new_starting_income", "income_diff", "row_converged"
       )))
 
-    df <- calculate_federal_payroll_taxes(df, tax_params$fed_payroll, year)
+    df <- calculate_federal_payroll_taxes(df, federal_payroll, year)
     df <- calculate_federal_income_tax(df, federal_standard_deduction)
     df <- calculate_tax_from_brackets(df, federal_tax_brackets,
                                       taxable_income_var = "taxable_income",
@@ -123,5 +130,6 @@ solve_starting_income_iterative <- function(df,
   df <- calculate_final_federal_income_tax(df)
 
   df %>%
-    select(-any_of(c("previous_income", "new_starting_income", "income_diff", "row_converged")))
+    select(-any_of(c("previous_income", "new_starting_income",
+                     "income_diff", "row_converged")))
 }
