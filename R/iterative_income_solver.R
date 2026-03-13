@@ -25,7 +25,7 @@ solve_starting_income_iterative <- function(df,
 
   credit_params <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_credits_df.csv",
                              package = "sssTaxCalculation"), show_col_types = FALSE) %>%
-    filter(year == !!year)
+    dplyr::filter(year == !!year)
 
   eitc_params  <- credit_params %>% dplyr::filter(credit == "eitc")
   cdctc_params <- credit_params %>% dplyr::filter(credit == "cdctc")
@@ -33,14 +33,14 @@ solve_starting_income_iterative <- function(df,
 
   federal_standard_deduction <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_sd_df.csv",
                               package = "sssTaxCalculation"), show_col_types = FALSE) %>%
-    filter(year == !!year) %>%
-    select(-year) %>%
-    pivot_wider(names_from = filing_status, values_from = deduction)
+    dplyr::filter(year == !!year) %>%
+    dplyr::select(-year) %>%
+    tidyr::pivot_wider(names_from = filing_status, values_from = deduction)
 
   federal_tax_brackets <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_income_brackets_df.csv",
                                        package = "sssTaxCalculation"), show_col_types = FALSE) %>%
-    filter(year == !!year) %>%
-    select(-year)
+    dplyr::filter(year == !!year) %>%
+    dplyr::select(-year)
 
   federal_payroll <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_payroll_df.csv",
                                        package = "sssTaxCalculation"), show_col_types = FALSE)
@@ -54,8 +54,8 @@ solve_starting_income_iterative <- function(df,
   df$converged        <- FALSE
 
   df <- df %>%
-    mutate(eitc_children = pmin(children, 2)) %>%
-    left_join(eitc_lookup_df, by = c("eitc_children", "household_type"), relationship = "many-to-one")
+    dplyr::mutate(eitc_children = pmin(children, 2)) %>%
+    dplyr::left_join(eitc_lookup_df, by = c("eitc_children", "household_type"), relationship = "many-to-one")
 
   if (debug) {
     cat("\n=== Starting Iterative Solver ===\n")
@@ -70,7 +70,7 @@ solve_starting_income_iterative <- function(df,
     df$previous_income <- df$starting_income
 
     df <- df %>%
-      select(-any_of(c(
+      dplyr::select(-any_of(c(
         "ss_income", "medicare_threshold", "ss_tax", "medicare_tax", "total_fed_payroll_tax",
         "fed_sd", "esi_premium_deduction", "total_fed_deductions", "taxable_income",
         "federal_cumulative_tax",
@@ -93,7 +93,7 @@ solve_starting_income_iterative <- function(df,
     df <- calculate_ctc_credit(df, ctc_params_list)
 
     df <- df %>%
-      mutate(
+      dplyr::mutate(
         total_taxes  = coalesce(total_fed_payroll_tax, 0) + coalesce(federal_cumulative_tax, 0),
         total_credits = coalesce(eitc_credit, 0) + coalesce(cdctc_credit, 0) + coalesce(ctc_credit, 0)
       )
@@ -130,6 +130,6 @@ solve_starting_income_iterative <- function(df,
   df <- calculate_final_federal_income_tax(df)
 
   df %>%
-    select(-any_of(c("previous_income", "new_starting_income",
+    dplyr::select(-any_of(c("previous_income", "new_starting_income",
                      "income_diff", "row_converged")))
 }

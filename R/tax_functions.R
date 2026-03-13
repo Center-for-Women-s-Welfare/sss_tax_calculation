@@ -61,7 +61,7 @@ calculate_tax_from_brackets <- function(df, brackets_df,
 #' @return Named list of payroll tax parameters
 load_fed_payroll_parameters <- function(tax_fed_payroll_df, year) {
   params_df <- tax_fed_payroll_df %>%
-    dplyr::filter(year == !!year)
+    filter(year == !!year)
 
   if (nrow(params_df) == 0) {
     stop(paste("No payroll parameters found for year", year))
@@ -129,7 +129,7 @@ build_eitc_lookup <- function(eitc_params) {
     household_type = c("single_parent", "single_adult", "married"),
     stringsAsFactors = FALSE
   ) %>%
-    mutate(filing_status = if_else(household_type == "married", "married", "single")) %>%
+    mutate(filing_status = ifelse(household_type == "married", "married", "single")) %>%
     left_join(eitc_params %>% filter(variable == "max_credit") %>% select(num_children, value),
               by = c("eitc_children" = "num_children")) %>% rename(eitc_max = value) %>%
     left_join(eitc_params %>% filter(variable == "phase_in_rate") %>% select(num_children, value),
