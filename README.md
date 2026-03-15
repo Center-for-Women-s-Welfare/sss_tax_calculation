@@ -31,12 +31,19 @@ The Self-Sufficiency Standard measures the income families need to meet basic ne
 ## Installation
 
 ```bash
-# Install from GitHub
-devtools::install_github("Center-for-Women-s-Welfare/sss_tax_calculation")
-
-# For development
+# Clone the repository
 git clone https://github.com/Center-for-Women-s-Welfare/sss_tax_calculation.git
 cd sss_tax_calculation
+
+R sss_tax_calculation   # depending on machine - open manually otherwise
+```
+
+```r
+# Within the R instance
+library(devtools)
+
+devtools::install_github("Center-for-Women-s-Welfare/sss_tax_calculation")
+library(sssTaxCalculation)   # update all packages!
 ```
 
 ## Usage
@@ -44,11 +51,10 @@ cd sss_tax_calculation
 ### In your R environment
 
 ```r
-# Load required library
-library(sssUtils)
+library(tidyverse) # ensures proper function calls
 
-# Source the iterative solver
-source(file.path(sss_code_base(), "sss_tax_calculation", "src", "calculations", "iterative_income_solver.R"))
+calculations_df <- [basic needs df]
+sss_year <- [tax year]
 
 # Call the solver (loads tax params from CSV automatically)
 calculations_df <- solve_starting_income_iterative(
@@ -59,6 +65,16 @@ calculations_df <- solve_starting_income_iterative(
   tolerance = 1.0,
   debug = TRUE  # Set to FALSE for production
 )
+```
+
+**To call the function without calling the package:**
+
+```r
+# Load utils package
+library(sssUtils)
+
+# Make sure file can be found at the local path prior to run
+source(file.path(sss_code_base(), "sss_tax_calculation", "src", "calculations", "iterative_income_solver.R"))
 ```
 
 ### Function Signature
