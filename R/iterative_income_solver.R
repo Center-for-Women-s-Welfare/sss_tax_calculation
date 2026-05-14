@@ -54,7 +54,7 @@ solve_starting_income_iterative <- function(df,
   df$converged        <- FALSE
 
   df <- df %>%
-    dplyr::mutate(eitc_children = pmin(children, 2)) %>%
+    dplyr::mutate(eitc_children = pmin(children, 3)) %>%
     dplyr::left_join(eitc_lookup_df, by = c("eitc_children", "household_type"), relationship = "many-to-one")
 
   if (debug) {

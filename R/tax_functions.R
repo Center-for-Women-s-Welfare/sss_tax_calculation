@@ -119,13 +119,13 @@ calculate_federal_payroll_taxes <- function(calculations_df, tax_fed_payroll_df,
 #' Build EITC Lookup Table
 #'
 #' Creates a lookup table with EITC parameters for all combinations of
-#' number of children (0-2) and household types
+#' number of children (0-3) and household types
 #'
 #' @param eitc_params Dataframe with EITC parameters from tax_fed_credits_df
 #' @return Dataframe with EITC parameters by eitc_children and household_type
 build_eitc_lookup <- function(eitc_params) {
   expand.grid(
-    eitc_children = 0:2,
+    eitc_children = 0:3,
     household_type = c("single_parent", "single_adult", "married"),
     stringsAsFactors = FALSE
   ) %>%
