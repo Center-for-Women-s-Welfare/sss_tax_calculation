@@ -1,0 +1,13 @@
+sss_year,variable,value
+2025,ss_rate,0.062
+2025,ss_wage_limit,176100
+2025,medicare_rate,0.0145
+2025,medicare_additional_rate,0.009
+2025,medicare_threshold_single_hh,200000
+2025,medicare_threshold_married,250000
+2026,ss_rate,0.062
+2026,ss_wage_limit,184500
+2026,medicare_rate,0.0145
+2026,medicare_additional_rate,0.009
+2026,medicare_threshold_single_hh,200000
+2026,medicare_threshold_married,250000
