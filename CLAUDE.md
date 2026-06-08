@@ -44,6 +44,10 @@ All federal tax math lives here as composable dataframe-in/dataframe-out functio
 - `extract_ctc_params()` / `calculate_ctc_credit()` — CTC: splits into non-refundable (limited by post-CDCTC tax liability) and refundable portions, where the refundable calculation differs for 1–2 children (income-based) vs. 3+ children (payroll-tax-based, "additional CTC").
 - `calculate_federal_income_tax()` / `calculate_final_federal_income_tax()` — standard deduction + ESI premium deduction → taxable income, then final liability after applying credits in order: CDCTC (non-refundable) → CTC refundable + EITC (refundable).
 
+**Reconciliation needed with `sss_production`:** the federal tax functions here may be out of sync with updates made to the federal tax code in `sss_production` since this package was split out. Before considering the state-tax integration complete, reconcile `R/tax_functions.R` and `R/data_loader.R` in this repo against `tax_federal.R` and `tax_functions.R` in `sss_production` — federal logic changes made there post-split may not have been ported back here.
+
+**File organization to revisit:** in `sss_production`, the federal tax functions were refactored out of `tax_functions.R` into a dedicated `tax_federal.R`. In this package they're still all together in `R/tax_functions.R`. Need to decide whether to split federal functions into their own file here too for consistency with `sss_production` (likely yes, especially as state tax functions are added alongside them).
+
 ### Convergence model
 
 Convergence is evaluated **per row, independently**, not for the whole dataframe at once — a row that converges at iteration 5 stops updating while others continue. The loop only exits early when `all(df$converged)`. `iteration_count` and `final_income_diff` reflect each row's own convergence point. Tolerance defaults to $1.
