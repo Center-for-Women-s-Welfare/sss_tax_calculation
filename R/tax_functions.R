@@ -334,15 +334,23 @@ calculate_federal_income_tax <- function(df, federal_standard_deduction) {
 
 #' Calculate Final Federal Income Tax
 #'
-#' Applies non-refundable and refundable credits to calculate final federal tax liability.
+#' Applies credits in statutory order to calculate final federal income tax liability:
+#' (1) CDCTC (non-refundable) against gross tax, (2) non-refundable CTC against remaining
+#' tax, (3) refundable credits (CTC refundable + EITC) against remaining liability.
 #'
-#' @param df Dataframe with federal_cumulative_tax, cdctc_credit, ctc_refundable, eitc_credit
-#' @return Dataframe with final federal income tax calculation columns added
+#' @param df Dataframe with federal_cumulative_tax, cdctc_credit, ctc_nonrefundable,
+#'   ctc_refundable, eitc_credit
+#' @return Dataframe with final federal income tax calculation columns added:
+#'   fed_cdctc_applied, federal_tax_after_cdctc, fed_ctc_nonrefundable_applied,
+#'   federal_tax_after_nonrefundable, federal_total_refundable_credits,
+#'   federal_tax_liability_with_refund, final_federal_income_tax
 calculate_final_federal_income_tax <- function(df) {
   df %>%
     mutate(
-      fed_nonrefundable_credit_applied  = pmin(cdctc_credit, federal_cumulative_tax),
-      federal_tax_after_nonrefundable   = pmax(federal_cumulative_tax - fed_nonrefundable_credit_applied, 0),
+      fed_cdctc_applied                 = pmin(cdctc_credit, federal_cumulative_tax),
+      federal_tax_after_cdctc           = pmax(federal_cumulative_tax - fed_cdctc_applied, 0),
+      fed_ctc_nonrefundable_applied     = pmin(ctc_nonrefundable, federal_tax_after_cdctc),
+      federal_tax_after_nonrefundable   = pmax(federal_tax_after_cdctc - fed_ctc_nonrefundable_applied, 0),
       federal_total_refundable_credits  = ctc_refundable + eitc_credit,
       federal_tax_liability_with_refund = federal_tax_after_nonrefundable - federal_total_refundable_credits,
       final_federal_income_tax          = pmax(federal_tax_liability_with_refund, 0)
