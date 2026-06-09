@@ -14,5 +14,5 @@ Dataframe with EITC parameters by eitc_children and household_type
 }
 \description{
 Creates a lookup table with EITC parameters for all combinations of
-number of children (0-2) and household types
+number of children (0-3) and household types
 }

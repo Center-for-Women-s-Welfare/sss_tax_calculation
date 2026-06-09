@@ -23,26 +23,30 @@ solve_starting_income_iterative <- function(df,
 
   tax_params <- load_federal_tax_params(year)
 
-  credit_params <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_credits_df.csv",
+  if (!is.null(state)) {
+    state_params <- load_state_tax_params(year, state)
+  }
+
+  credit_params <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_credits.csv",
                              package = "sssTaxCalculation"), show_col_types = FALSE) %>%
-    dplyr::filter(year == !!year)
+    dplyr::filter(sss_year == !!year)
 
   eitc_params  <- credit_params %>% dplyr::filter(credit == "eitc")
   cdctc_params <- credit_params %>% dplyr::filter(credit == "cdctc")
   ctc_params   <- credit_params %>% dplyr::filter(credit == "ctc")
 
-  federal_standard_deduction <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_sd_df.csv",
+  federal_standard_deduction <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_sd.csv",
                               package = "sssTaxCalculation"), show_col_types = FALSE) %>%
-    dplyr::filter(year == !!year) %>%
-    dplyr::select(-year) %>%
+    dplyr::filter(sss_year == !!year) %>%
+    dplyr::select(-"sss_year") %>%
     tidyr::pivot_wider(names_from = filing_status, values_from = deduction)
 
-  federal_tax_brackets <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_income_brackets_df.csv",
+  federal_tax_brackets <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_income_brackets.csv",
                                        package = "sssTaxCalculation"), show_col_types = FALSE) %>%
-    dplyr::filter(year == !!year) %>%
-    dplyr::select(-year)
+    dplyr::filter(sss_year == !!year) %>%
+    dplyr::select(-"sss_year")
 
-  federal_payroll <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_payroll_df.csv",
+  federal_payroll <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_payroll.csv",
                                        package = "sssTaxCalculation"), show_col_types = FALSE)
 
   eitc_lookup_df    <- build_eitc_lookup(eitc_params)
@@ -79,8 +83,10 @@ solve_starting_income_iterative <- function(df,
         "ctc_credit_base", "federal_tax_after_cdctc", "ctc_nonrefundable",
         "ctc_income_based_refund", "ctc_refund_1to2_children", "ctc_payroll_based_refund",
         "ctc_refund_3plus_children", "ctc_refundable", "ctc_credit",
-        "total_taxes", "total_credits", "new_starting_income", "income_diff", "row_converged"
-      )))
+        "total_taxes", "total_credits", "new_starting_income", "income_diff", "row_converged",
+        "state_payroll_tax", "total_state_deductions", "state_taxable_income", "state_cumulative_tax"
+      ))) %>%
+      dplyr::select(-dplyr::matches("^payroll_tax_"))
 
     df <- calculate_federal_payroll_taxes(df, federal_payroll, year)
     df <- calculate_federal_income_tax(df, federal_standard_deduction)
@@ -92,11 +98,32 @@ solve_starting_income_iterative <- function(df,
     df <- calculate_cdctc_credit(df, cdctc_params_list)
     df <- calculate_ctc_credit(df, ctc_params_list)
 
+    if (!is.null(state)) {
+      df <- calculate_state_payroll_taxes(df, state_params$state_payroll, year, state)
+      df <- calculate_state_taxable_income(df, state_params$state_ti_adjustments, state, debug)
+      df <- calculate_tax_from_brackets(df, state_params$state_brackets,
+                                        taxable_income_var = "state_taxable_income",
+                                        filing_status_var  = "filing_status",
+                                        output_col         = "state_cumulative_tax")
+      df <- calculate_state_tax_credits(df, state_params$state_credits,
+                                        state_params$state_variable_brackets,
+                                        state_params$state_eitc_lookup,
+                                        year, state, debug)
+    }
+
     df <- df %>%
       dplyr::mutate(
         total_taxes  = coalesce(total_fed_payroll_tax, 0) + coalesce(federal_cumulative_tax, 0),
         total_credits = coalesce(eitc_credit, 0) + coalesce(cdctc_credit, 0) + coalesce(ctc_credit, 0)
       )
+
+    if (!is.null(state)) {
+      df <- df %>%
+        dplyr::mutate(
+          total_taxes   = total_taxes   + coalesce(state_payroll_tax, 0) + coalesce(state_cumulative_tax, 0),
+          total_credits = total_credits + coalesce(state_nonrefundable_credits, 0) + coalesce(state_refundable_credits, 0)
+        )
+    }
 
     df$new_starting_income <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
     df$income_diff         <- abs(df$new_starting_income - df$previous_income)
@@ -128,6 +155,9 @@ solve_starting_income_iterative <- function(df,
   print_convergence_summary(df, debug)
 
   df <- calculate_final_federal_income_tax(df)
+  if (!is.null(state)) {
+    df <- calculate_final_state_income_tax(df)
+  }
 
   df %>%
     dplyr::select(-any_of(c("previous_income", "new_starting_income",

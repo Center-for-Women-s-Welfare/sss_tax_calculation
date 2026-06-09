@@ -223,9 +223,9 @@ calculate_state_taxable_income <- function(calculations_df,
   # Build in a fixed order so deduction components are transparent for review
   total_vars <- c(
     "standard_deduction", "personal_exemption", "dependent_exemption",
-    "health_ins_deduction", "cdctc_subtraction_max", "state_cdctc_subtraction",
+    "state_health_ins_deductible", "cdctc_subtraction_max", "state_cdctc_subtraction",
     setdiff(calculation_vars, c("standard_deduction", "personal_exemption",
-                                "dependent_exemption", "health_ins_deduction",
+                                "dependent_exemption", "state_health_ins_deductible",
                                 "cdctc_subtraction_max"))
   )
 
@@ -244,11 +244,11 @@ calculate_state_taxable_income <- function(calculations_df,
       total_state_deductions = standard_deduction +
         personal_exemption +
         dependent_exemption +
-        dplyr::if_else(health_ins_deduction == 1, esi_premium_deduction, 0) +
+        dplyr::if_else(state_health_ins_deductible == 1, esi_premium_deduction, 0) +
         state_cdctc_subtraction +
         rowSums(dplyr::across(dplyr::all_of(setdiff(calculation_vars, c(
           "standard_deduction", "personal_exemption", "dependent_exemption",
-          "health_ins_deduction", "cdctc_subtraction_max"
+          "state_health_ins_deductible", "cdctc_subtraction_max"
         )))), na.rm = TRUE),
       state_taxable_income = pmax(starting_income - total_state_deductions, 0)
     )
