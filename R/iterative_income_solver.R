@@ -84,6 +84,11 @@ solve_starting_income_iterative <- function(df,
         "ctc_credit_base", "federal_tax_after_cdctc", "ctc_nonrefundable",
         "ctc_income_based_refund", "ctc_refund_1to2_children", "ctc_payroll_based_refund",
         "ctc_refund_3plus_children", "ctc_refundable", "ctc_credit",
+        "fed_cdctc_applied", "federal_tax_after_nonrefundable", "fed_ctc_nonrefundable_applied",
+        "federal_total_refundable_credits", "federal_tax_liability_with_refund", "final_federal_income_tax",
+        "state_nonrefundable_credit_applied", "state_tax_after_nonrefundable",
+        "state_tax_liability_with_refund", "final_state_income_tax",
+        "federal_net", "state_net",
         "total_taxes", "total_credits", "new_starting_income", "income_diff", "row_converged",
         "state_payroll_tax", "total_state_deductions", "state_taxable_income", "state_cumulative_tax"
       ))) %>%
@@ -112,19 +117,25 @@ solve_starting_income_iterative <- function(df,
                                         year, state, debug)
     }
 
+    df <- calculate_final_federal_income_tax(df)
+    if (!is.null(state)) {
+      df <- calculate_final_state_income_tax(df)
+    } else {
+      df$state_payroll_tax              <- 0
+      df$state_tax_liability_with_refund <- 0
+    }
+
     df <- df %>%
       dplyr::mutate(
-        total_taxes  = coalesce(total_fed_payroll_tax, 0) + coalesce(federal_cumulative_tax, 0),
-        total_credits = coalesce(eitc_credit, 0) + coalesce(cdctc_credit, 0) + coalesce(ctc_refundable, 0)
+        federal_net = coalesce(federal_tax_liability_with_refund, 0),
+        state_net   = coalesce(state_tax_liability_with_refund, 0),
+        total_taxes   = coalesce(total_fed_payroll_tax, 0) +
+                        coalesce(state_payroll_tax, 0) +
+                        pmax(federal_net, 0) +
+                        pmax(state_net, 0),
+        total_credits = pmax(-federal_net, 0) +
+                        pmax(-state_net, 0)
       )
-
-    if (!is.null(state)) {
-      df <- df %>%
-        dplyr::mutate(
-          total_taxes   = total_taxes   + coalesce(state_payroll_tax, 0) + coalesce(state_cumulative_tax, 0),
-          total_credits = total_credits + coalesce(state_refundable_credits, 0)
-        )
-    }
 
     df$new_starting_income <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
     df$income_diff         <- abs(df$new_starting_income - df$previous_income)
