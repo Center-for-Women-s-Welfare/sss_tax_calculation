@@ -24,7 +24,8 @@ solve_starting_income_iterative <- function(df,
   tax_params <- load_federal_tax_params(year)
 
   if (!is.null(state)) {
-    state_params <- load_state_tax_params(year, state)
+    state_params      <- load_state_tax_params(year, state)
+    state_eitc_lookup <- build_state_eitc_lookup(state_params$state_eitc_lookup)
   }
 
   credit_params <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_credits.csv",
@@ -107,7 +108,7 @@ solve_starting_income_iterative <- function(df,
                                         output_col         = "state_cumulative_tax")
       df <- calculate_state_tax_credits(df, state_params$state_credits,
                                         state_params$state_variable_brackets,
-                                        state_params$state_eitc_lookup,
+                                        state_eitc_lookup,
                                         year, state, debug)
     }
 

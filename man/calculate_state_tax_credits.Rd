@@ -8,7 +8,7 @@ calculate_state_tax_credits(
   calculations_df,
   tax_state_credits_df,
   tax_state_variable_brackets_df,
-  tax_state_eitc_lookup_df,
+  state_eitc_lookup,
   year,
   state,
   debug = FALSE
@@ -24,8 +24,8 @@ filtered to the target year and state}
 \item{tax_state_variable_brackets_df}{Dataframe of state variable-bracket
 parameters already filtered to the target year and state}
 
-\item{tax_state_eitc_lookup_df}{Dataframe of state EITC lookup values
-already filtered to the target year and state}
+\item{state_eitc_lookup}{Pre-built state EITC lookup list from
+\code{build_state_eitc_lookup()}, constructed before the solver loop}
 
 \item{year}{Tax year, used only in the diagnostic message when no credits
 are found}

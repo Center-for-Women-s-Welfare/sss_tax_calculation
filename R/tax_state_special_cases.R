@@ -100,55 +100,82 @@ apply_commuter_deduction <- function(calculations_df, state_adjustments, calcula
 
 # ---------- CREDIT SPECIAL CASES -----------------------------------
 
+#' Build State EITC Lookup Table
+#'
+#' Pre-processes the state EITC lookup CSV (wide format with one value column
+#' per child count) into a long-format table keyed by `(bracket_idx,
+#' ca_eitc_children)`, plus an `income_min` breaks vector for
+#' [findInterval()]. Called once before the solver loop so that
+#' [apply_CA_eitc()] can do an O(n log m) bracket lookup each iteration
+#' instead of a per-iteration fuzzyjoin.
+#'
+#' @param eitc_lookup_df State EITC lookup table already filtered to year/state,
+#'   with `income_min`, `income_max`, and `value_0` through `value_3` columns
+#' @return Named list with `table` (long-format lookup keyed by `bracket_idx`
+#'   and `ca_eitc_children`, also carrying `eitc_income_max`) and `breaks`
+#'   (sorted `income_min` vector for [findInterval()])
+build_state_eitc_lookup <- function(eitc_lookup_df) {
+  if (nrow(eitc_lookup_df) == 0L) {
+    return(list(table = NULL, breaks = numeric(0)))
+  }
+
+  lookup_sorted <- eitc_lookup_df %>%
+    dplyr::arrange(income_min) %>%
+    dplyr::mutate(bracket_idx = dplyr::row_number())
+
+  value_cols <- names(lookup_sorted)[startsWith(names(lookup_sorted), "value_")]
+
+  lookup_long <- lookup_sorted %>%
+    tidyr::pivot_longer(
+      cols      = dplyr::all_of(value_cols),
+      names_to  = "ca_eitc_children",
+      names_prefix = "value_",
+      values_to = "credit_ca_eitc"
+    ) %>%
+    dplyr::mutate(ca_eitc_children = as.integer(ca_eitc_children)) %>%
+    dplyr::select(bracket_idx, ca_eitc_children, credit_ca_eitc,
+                  eitc_income_max = income_max)
+
+  list(
+    table  = lookup_long,
+    breaks = lookup_sorted$income_min
+  )
+}
+
 #' Apply California EITC (State Special Case)
 #'
-#' Looks up California's EITC credit amount from the state EITC lookup table,
-#' which provides credit values by income bracket and number of qualifying
-#' children (0–3+). Uses a fuzzy join on `starting_income` against the lookup's
-#' income ranges, then selects the column matching `ca_eitc_children`.
+#' Looks up California's EITC credit amount using a pre-built lookup list from
+#' `build_state_eitc_lookup()`. Uses [findInterval()] to assign each row to an
+#' income bracket (O(n log m)) and then a simple left_join — replacing the
+#' per-iteration fuzzyjoin that was the main solver bottleneck on large datasets.
 #'
 #' Must be called before [apply_CA_yctc()], which depends on `credit_ca_eitc`.
 #'
 #' @param calculations_df Dataframe with starting_income and children
-#' @param tax_state_eitc_lookup_df CA EITC lookup table with income_min, income_max,
-#'   and value_0 through value_3 columns
+#' @param state_eitc_lookup Pre-built lookup list from `build_state_eitc_lookup()`,
+#'   with elements `table` (long-format keyed by `bracket_idx` and
+#'   `ca_eitc_children`) and `breaks` (income_min vector for [findInterval()])
 #' @return Dataframe with `credit_ca_eitc` column added
-apply_CA_eitc <- function(calculations_df, tax_state_eitc_lookup_df) {
-
-  calculations_df <- calculations_df %>%
-    dplyr::mutate(
-      ca_eitc_children      = pmin(children, 3),
-      ca_eitc_lookup_income = starting_income
-    )
-
-  ca_eitc_joined <- calculations_df %>%
-    dplyr::mutate(row_id = dplyr::row_number()) %>%
-    fuzzyjoin::fuzzy_left_join(
-      tax_state_eitc_lookup_df,
-      by = c("ca_eitc_lookup_income" = "income_min",
-             "ca_eitc_lookup_income" = "income_max"),
-      match_fun = list(`>=`, `<=`)
-    ) %>%
-    dplyr::group_by(row_id) %>%
-    dplyr::slice(1) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(
-      credit_ca_eitc = dplyr::case_when(
-        ca_eitc_children == 0  ~ value_0,
-        ca_eitc_children == 1  ~ value_1,
-        ca_eitc_children == 2  ~ value_2,
-        ca_eitc_children >= 3  ~ value_3,
-        TRUE                   ~ 0
-      ),
-      credit_ca_eitc = dplyr::coalesce(credit_ca_eitc, 0)
-    ) %>%
-    dplyr::select(row_id, credit_ca_eitc)
+apply_CA_eitc <- function(calculations_df, state_eitc_lookup) {
+  if (is.null(state_eitc_lookup$table)) {
+    return(calculations_df %>% dplyr::mutate(credit_ca_eitc = 0))
+  }
 
   calculations_df %>%
-    dplyr::mutate(row_id = dplyr::row_number()) %>%
-    dplyr::left_join(ca_eitc_joined, by = "row_id") %>%
-    dplyr::select(-row_id) %>%
-    dplyr::mutate(credit_ca_eitc = dplyr::coalesce(credit_ca_eitc, 0))
+    dplyr::mutate(
+      ca_eitc_children = pmin(children, 3L),
+      bracket_idx      = findInterval(starting_income, state_eitc_lookup$breaks)
+    ) %>%
+    dplyr::left_join(
+      state_eitc_lookup$table,
+      by           = c("ca_eitc_children", "bracket_idx"),
+      relationship = "many-to-one"
+    ) %>%
+    dplyr::mutate(
+      credit_ca_eitc = dplyr::if_else(starting_income > eitc_income_max, 0, credit_ca_eitc),
+      credit_ca_eitc = dplyr::coalesce(credit_ca_eitc, 0)
+    ) %>%
+    dplyr::select(-bracket_idx, -eitc_income_max)
 }
 
 #' Apply California Young Child Tax Credit (State Special Case)

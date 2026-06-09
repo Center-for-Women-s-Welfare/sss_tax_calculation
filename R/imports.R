@@ -5,7 +5,7 @@
 #'   group_by summarize rename pull case_when if_else row_number bind_rows
 #'   across all_of distinct slice ungroup full_join
 #' @importFrom dplyr `%>%`
-#' @importFrom tidyr pivot_wider
+#' @importFrom tidyr pivot_wider pivot_longer
 #' @importFrom readr read_csv
 #' @importFrom rlang `!!` .data sym
 #' @importFrom utils head

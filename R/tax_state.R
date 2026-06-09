@@ -273,6 +273,59 @@ calculate_state_taxable_income <- function(calculations_df,
 }
 
 
+# ---------- BRACKET LOOKUP HELPER -----------------------------------
+
+# Match each df row to its income bracket value using findInterval().
+# Tries exact filing_status first; falls back to "all" for unmatched rows.
+# This replaces the per-iteration fuzzyjoin in the generic credit loop.
+#
+# bracket_df must have columns: filing_status, income_min, income_max, value.
+# Returns a numeric vector length n with NA where no bracket matched.
+.bracket_lookup <- function(income, filing_status, bracket_df) {
+  n      <- length(income)
+  result <- rep(NA_real_, n)
+
+  bracket_df <- bracket_df %>%
+    dplyr::mutate(
+      filing_status = dplyr::if_else(
+        is.na(filing_status) | trimws(filing_status) == "", "all",
+        as.character(filing_status)
+      )
+    )
+
+  specific <- bracket_df %>% dplyr::filter(filing_status != "all")
+  all_rows <- bracket_df %>% dplyr::filter(filing_status == "all")
+
+  for (fs in unique(specific$filing_status)) {
+    fs_brk     <- specific %>% dplyr::filter(filing_status == fs) %>% dplyr::arrange(income_min)
+    rows_in_fs <- which(filing_status == fs)
+    if (length(rows_in_fs) == 0L || nrow(fs_brk) == 0L) next
+
+    idx         <- findInterval(income[rows_in_fs], fs_brk$income_min)
+    clipped_idx <- pmax(pmin(idx, nrow(fs_brk)), 1L)
+    in_range    <- idx >= 1L & idx <= nrow(fs_brk) &
+                   income[rows_in_fs] <= fs_brk$income_max[clipped_idx]
+
+    result[rows_in_fs[in_range]] <- as.numeric(fs_brk$value[clipped_idx[in_range]])
+  }
+
+  if (nrow(all_rows) > 0L) {
+    all_brk   <- all_rows %>% dplyr::arrange(income_min)
+    unmatched <- which(is.na(result))
+    if (length(unmatched) > 0L) {
+      idx         <- findInterval(income[unmatched], all_brk$income_min)
+      clipped_idx <- pmax(pmin(idx, nrow(all_brk)), 1L)
+      in_range    <- idx >= 1L & idx <= nrow(all_brk) &
+                     income[unmatched] <= all_brk$income_max[clipped_idx]
+
+      result[unmatched[in_range]] <- as.numeric(all_brk$value[clipped_idx[in_range]])
+    }
+  }
+
+  result
+}
+
+
 # ---------- STATE TAX CREDITS ---------------------------------------
 
 #' Calculate State Tax Credits
@@ -293,8 +346,8 @@ calculate_state_taxable_income <- function(calculations_df,
 #'   filtered to the target year and state
 #' @param tax_state_variable_brackets_df Dataframe of state variable-bracket
 #'   parameters already filtered to the target year and state
-#' @param tax_state_eitc_lookup_df Dataframe of state EITC lookup values
-#'   already filtered to the target year and state
+#' @param state_eitc_lookup Pre-built state EITC lookup list from
+#'   `build_state_eitc_lookup()`, constructed before the solver loop
 #' @param year Tax year, used only in the diagnostic message when no credits
 #'   are found
 #' @param state State postal code, used for diagnostic messaging and
@@ -305,7 +358,7 @@ calculate_state_taxable_income <- function(calculations_df,
 calculate_state_tax_credits <- function(calculations_df,
                                         tax_state_credits_df,
                                         tax_state_variable_brackets_df,
-                                        tax_state_eitc_lookup_df,
+                                        state_eitc_lookup,
                                         year,
                                         state,
                                         debug = FALSE) {
@@ -431,57 +484,21 @@ calculate_state_tax_credits <- function(calculations_df,
       calculations_df[[credit_col]] <- dplyr::coalesce(tmp[[credit_col]], 0)
 
     } else {
-      # Case B: income-bracketed value; try exact filing_status then fall back to "all"
-      bracket_df <- rows %>%
-        dplyr::mutate(
-          filing_status = dplyr::if_else(
-            is.na(filing_status) | filing_status == "", "all", filing_status
-          )
-        )
+      # Case B: income-bracketed value — findInterval() + exact/all fallback
+      matched_values <- .bracket_lookup(
+        income        = calculations_df$starting_income,
+        filing_status = calculations_df$state_filing_status,
+        bracket_df    = rows
+      )
 
-      df_exact <- calculations_df %>%
-        dplyr::mutate(row_id = dplyr::row_number()) %>%
-        fuzzyjoin::fuzzy_left_join(
-          bracket_df %>% dplyr::filter(filing_status != "all"),
-          by = c("state_filing_status" = "filing_status",
-                 "starting_income"     = "income_min",
-                 "starting_income"     = "income_max"),
-          match_fun = list(`==`, `>=`, `<=`)
-        ) %>%
-        dplyr::group_by(row_id) %>%
-        dplyr::slice(1) %>%
-        dplyr::ungroup() %>%
-        dplyr::select(row_id, value)
-
-      df_all <- calculations_df %>%
-        dplyr::mutate(row_id = dplyr::row_number()) %>%
-        fuzzyjoin::fuzzy_left_join(
-          bracket_df %>% dplyr::filter(filing_status == "all"),
-          by = c("starting_income" = "income_min",
-                 "starting_income" = "income_max"),
-          match_fun = list(`>=`, `<=`)
-        ) %>%
-        dplyr::group_by(row_id) %>%
-        dplyr::slice(1) %>%
-        dplyr::ungroup() %>%
-        dplyr::select(row_id, value_all = value)
-
-      df_bracketed <- dplyr::full_join(df_exact, df_all, by = "row_id") %>%
-        dplyr::mutate(value = dplyr::coalesce(value, value_all)) %>%
-        dplyr::select(row_id, value)
-
-      calc_joined <- calculations_df %>%
-        dplyr::mutate(row_id = dplyr::row_number()) %>%
-        dplyr::left_join(df_bracketed, by = "row_id")
-
-      calc_joined[[credit_col]] <- apply_calculation_method(
-        value_vector    = calc_joined$value,
+      credit_values <- apply_calculation_method(
+        value_vector    = matched_values,
         method          = method,
         calculations_df = calculations_df,
         var_name        = var
       )
 
-      calculations_df[[credit_col]] <- dplyr::coalesce(calc_joined[[credit_col]], 0)
+      calculations_df[[credit_col]] <- dplyr::coalesce(credit_values, 0)
     }
 
     if (refundable_flag == 1L) {
@@ -496,8 +513,8 @@ calculate_state_tax_credits <- function(calculations_df,
   # Special-case credit formulas
   if ("special_ca_eitc" %in% state_credits$calculation_method) {
     calculations_df <- apply_CA_eitc(
-      calculations_df          = calculations_df,
-      tax_state_eitc_lookup_df = tax_state_eitc_lookup_df
+      calculations_df  = calculations_df,
+      state_eitc_lookup = state_eitc_lookup
     )
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_refundable_credits = state_refundable_credits + credit_ca_eitc)

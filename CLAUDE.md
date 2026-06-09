@@ -52,11 +52,17 @@ All federal tax math lives here as composable dataframe-in/dataframe-out functio
 
 Convergence is evaluated **per row, independently**, not for the whole dataframe at once — a row that converges at iteration 5 stops updating while others continue. The loop only exits early when `all(df$converged)`. `iteration_count` and `final_income_diff` reflect each row's own convergence point. Tolerance defaults to $1.
 
+**Known convergence issue — CO credit cliffs:** 13 non-converged rows observed in CO production data, all `single_parent` households near credit phase-out thresholds. Most have small `final_income_diff` but two have ~$4,300 difference. The oscillation is likely caused by the solver jumping across a credit cliff each iteration (income rises → credit drops → income falls → credit returns). Investigate whether a damping factor (e.g., blend `new = 0.5 * new + 0.5 * previous`) or a bisection fallback for non-converged rows would stabilize these cases.
+
 ### Tax parameter data (`inst/extdata/`)
 
 CSVs are organized by domain and year: `inst/extdata/federal/{year}/` and `inst/extdata/state/{year}/`. To support a new tax year, add a new `{year}/` directory with CSVs following the existing schema (see `load_federal_tax_params()` for expected filenames and `load_fed_payroll_parameters()`/`extract_cdctc_params()`/`extract_ctc_params()` for expected `variable`/`value` long-format structure within the credits CSV).
 
-**Known inconsistency to check before relying on 2026 federal data:** commit `3ed8097` renamed the federal CSVs from `tax_fed_*_df.csv` to `tax_fed_*.csv` (e.g. `tax_fed_payroll_df.csv` → `tax_fed_payroll.csv`), but `load_federal_tax_params()` (`R/data_loader.R`) and the inline `read_csv` calls in `solve_starting_income_iterative()` still reference the old `*_df.csv` filenames. This will currently cause a "file not found" failure when loading 2026 federal params — verify filenames match before debugging further upstream.
+**CSV filename note (resolved):** commit `3ed8097` renamed the federal CSVs from `tax_fed_*_df.csv` to `tax_fed_*.csv`. The inline `read_csv` calls in `solve_starting_income_iterative()` have been updated to match — this is no longer an issue.
+
+## Known performance issues
+
+**State EITC fuzzyjoin (resolved):** `apply_CA_eitc()` previously used `fuzzyjoin::fuzzy_left_join()` inside the convergence loop, which was the main bottleneck on large datasets. Refactored: `build_state_eitc_lookup()` (`R/tax_state_special_cases.R`) now pre-processes the lookup table once before the loop into long format keyed by `(bracket_idx, ca_eitc_children)`; `apply_CA_eitc()` uses `findInterval()` + `left_join` each iteration instead. Pattern mirrors the federal EITC (`build_eitc_lookup()` / `calculate_eitc_credit()`). Other income-bracketed credits in the general Case B loop in `calculate_state_tax_credits()` still use fuzzyjoin and may warrant a similar treatment if they become bottlenecks.
 
 ## Testing notes
 

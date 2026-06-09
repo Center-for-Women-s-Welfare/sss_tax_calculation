@@ -4,22 +4,23 @@
 \alias{apply_CA_eitc}
 \title{Apply California EITC (State Special Case)}
 \usage{
-apply_CA_eitc(calculations_df, tax_state_eitc_lookup_df)
+apply_CA_eitc(calculations_df, state_eitc_lookup)
 }
 \arguments{
 \item{calculations_df}{Dataframe with starting_income and children}
 
-\item{tax_state_eitc_lookup_df}{CA EITC lookup table with income_min, income_max,
-and value_0 through value_3 columns}
+\item{state_eitc_lookup}{Pre-built lookup list from \code{build_state_eitc_lookup()},
+with elements \code{table} (long-format keyed by \code{bracket_idx} and
+\code{ca_eitc_children}) and \code{breaks} (income_min vector for \code{\link[=findInterval]{findInterval()}})}
 }
 \value{
 Dataframe with \code{credit_ca_eitc} column added
 }
 \description{
-Looks up California's EITC credit amount from the state EITC lookup table,
-which provides credit values by income bracket and number of qualifying
-children (0–3+). Uses a fuzzy join on \code{starting_income} against the lookup's
-income ranges, then selects the column matching \code{ca_eitc_children}.
+Looks up California's EITC credit amount using a pre-built lookup list from
+\code{build_state_eitc_lookup()}. Uses \code{\link[=findInterval]{findInterval()}} to assign each row to an
+income bracket (O(n log m)) and then a simple left_join — replacing the
+per-iteration fuzzyjoin that was the main solver bottleneck on large datasets.
 }
 \details{
 Must be called before \code{\link[=apply_CA_yctc]{apply_CA_yctc()}}, which depends on \code{credit_ca_eitc}.
