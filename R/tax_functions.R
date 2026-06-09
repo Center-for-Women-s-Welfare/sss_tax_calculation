@@ -158,9 +158,8 @@ calculate_federal_payroll_taxes <- function(calculations_df, tax_fed_payroll_df,
 
   calculations_df$total_fed_payroll_tax <-
     ifelse(calculations_df$household_type == "married",
-           calculations_df$ss_tax * 2,
-           calculations_df$ss_tax) +
-    calculations_df$medicare_tax
+           (calculations_df$ss_tax + calculations_df$medicare_tax) * 2,
+           calculations_df$ss_tax + calculations_df$medicare_tax)
 
   return(calculations_df)
 }
