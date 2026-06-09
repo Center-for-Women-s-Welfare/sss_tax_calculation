@@ -52,7 +52,9 @@ All federal tax math lives here as composable dataframe-in/dataframe-out functio
 
 Convergence is evaluated **per row, independently**, not for the whole dataframe at once — a row that converges at iteration 5 stops updating while others continue. The loop only exits early when `all(df$converged)`. `iteration_count` and `final_income_diff` reflect each row's own convergence point. Tolerance defaults to $1.
 
-**Known convergence issue — CO credit cliffs:** 13 non-converged rows observed in CO production data, all `single_parent` households near credit phase-out thresholds. Most have small `final_income_diff` but two have ~$4,300 difference. The oscillation is likely caused by the solver jumping across a credit cliff each iteration (income rises → credit drops → income falls → credit returns). Investigate whether a damping factor (e.g., blend `new = 0.5 * new + 0.5 * previous`) or a bisection fallback for non-converged rows would stabilize these cases.
+**Known convergence issue — CO credit cliffs:** 18/46,016 CO rows (0.04%) fail to converge even with damping=0.5 — all `single_adult` + teenagers-only family types in very low-cost rural counties where the EITC phase-in creates a steep credit cliff that causes oscillation. The remaining non-convergence after damping confirms bisection is the right next step.
+
+**Future improvement — bisection fallback solver:** implement bisection search as a fallback for rows still non-converged after the main damped fixed-point loop. Approach: bracket the true income between `low = subtotal3 * 12` (no taxes) and `high = subtotal3 * 24` (rough upper bound), then bisect each iteration based on whether `starting_income` exceeds or falls short of `basic_needs + net_taxes`. Guaranteed to converge in ~20 iterations for any well-behaved function. Implement as a fallback path in `solve_starting_income_iterative()` that activates only for rows still flagged non-converged after the main loop completes. Implement as a separate PR after the current state-tax integration is merged and stable.
 
 ### Tax parameter data (`inst/extdata/`)
 
