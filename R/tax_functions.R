@@ -53,7 +53,7 @@ calculate_tax_from_brackets <- function(df, brackets_df,
 #' Transforms a vector of raw parameter values (typically joined from a tax
 #' parameter CSV) into per-row computed amounts by applying one of the
 #' supported `calculation_method` strings. This is the shared dispatch function
-#' used by both state taxable-income adjustment logic and state credit logic —
+#' used by both state taxable-income adjustment logic and state credit logic --
 #' any new method needed by a state's CSV data should be added here.
 #'
 #' Supported methods: `fixed` / `flat` / `flag` (return value as-is),
@@ -96,7 +96,7 @@ apply_calculation_method <- function(value_vector, method, calculations_df, var_
   } else if (method == "percent_of_fed_cdctc") {
     v * calculations_df$cdctc_credit
   } else {
-    warning(glue::glue("Unknown calculation_method '{method}' for '{var_name}' — returning 0."))
+    warning(glue::glue("Unknown calculation_method '{method}' for '{var_name}' -- returning 0."))
     rep(0, length(value_vector))
   }
 }

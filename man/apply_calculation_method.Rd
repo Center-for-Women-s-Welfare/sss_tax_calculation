@@ -29,7 +29,7 @@ Numeric vector the same length as \code{value_vector}
 Transforms a vector of raw parameter values (typically joined from a tax
 parameter CSV) into per-row computed amounts by applying one of the
 supported \code{calculation_method} strings. This is the shared dispatch function
-used by both state taxable-income adjustment logic and state credit logic —
+used by both state taxable-income adjustment logic and state credit logic --
 any new method needed by a state's CSV data should be added here.
 }
 \details{
