@@ -64,6 +64,8 @@ CSVs are organized by domain and year: `inst/extdata/federal/{year}/` and `inst/
 
 **State EITC fuzzyjoin (resolved):** `apply_CA_eitc()` previously used `fuzzyjoin::fuzzy_left_join()` inside the convergence loop, which was the main bottleneck on large datasets. Refactored: `build_state_eitc_lookup()` (`R/tax_state_special_cases.R`) now pre-processes the lookup table once before the loop into long format keyed by `(bracket_idx, ca_eitc_children)`; `apply_CA_eitc()` uses `findInterval()` + `left_join` each iteration instead. Pattern mirrors the federal EITC (`build_eitc_lookup()` / `calculate_eitc_credit()`). Other income-bracketed credits in the general Case B loop in `calculate_state_tax_credits()` still use fuzzyjoin and may warrant a similar treatment if they become bottlenecks.
 
+**Freeze converged rows in solver loop (not yet implemented):** the current loop recomputes all tax calculations for every row on every iteration, even rows that have already converged. Copilot analysis (June 2026) recommends a practical middle ground: keep the full-dataframe dplyr pipeline structure but gate `starting_income` updates with `ifelse(converged, starting_income, new_estimate)` so converged rows stop drifting. Benefits: prevents post-convergence drift, reduces wasted computation in later iterations (most rows converge early), and makes `iteration_count` semantics cleaner. Main tradeoff is added complexity in a pipeline that already handles transient per-iteration columns. Recommend as a separate PR after the state-tax integration is stable.
+
 ## Testing notes
 
 - Mock dataframes in `tests/testthat/test-iterative_income_solver.R` are pulled from real 2026 Iowa basic-needs data — they reflect realistic but state-specific values.
