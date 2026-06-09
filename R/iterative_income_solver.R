@@ -24,8 +24,6 @@ solve_starting_income_iterative <- function(df,
 
   validate_input(df)
 
-  tax_params <- load_federal_tax_params(year)
-
   if (!is.null(state)) {
     state_params      <- load_state_tax_params(year, state)
     state_eitc_lookup <- build_state_eitc_lookup(state_params$state_eitc_lookup)
