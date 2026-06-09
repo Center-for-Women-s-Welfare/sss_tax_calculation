@@ -115,14 +115,14 @@ solve_starting_income_iterative <- function(df,
     df <- df %>%
       dplyr::mutate(
         total_taxes  = coalesce(total_fed_payroll_tax, 0) + coalesce(federal_cumulative_tax, 0),
-        total_credits = coalesce(eitc_credit, 0) + coalesce(cdctc_credit, 0) + coalesce(ctc_credit, 0)
+        total_credits = coalesce(eitc_credit, 0) + coalesce(cdctc_credit, 0) + coalesce(ctc_refundable, 0)
       )
 
     if (!is.null(state)) {
       df <- df %>%
         dplyr::mutate(
           total_taxes   = total_taxes   + coalesce(state_payroll_tax, 0) + coalesce(state_cumulative_tax, 0),
-          total_credits = total_credits + coalesce(state_nonrefundable_credits, 0) + coalesce(state_refundable_credits, 0)
+          total_credits = total_credits + coalesce(state_refundable_credits, 0)
         )
     }
 
