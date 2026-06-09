@@ -9,6 +9,8 @@
 #' @param state State abbreviation (reserved for future state tax support)
 #' @param max_iterations Maximum number of solver iterations (default: 100)
 #' @param tolerance Convergence threshold in dollars (default: 1.0)
+#' @param damping Blending weight applied to the previous estimate on each step (0 = no damping,
+#'   1 = never moves). Default 0.5 blends equally, which stabilises oscillation near credit cliffs.
 #' @param debug If TRUE, print iteration progress and diagnostics
 #' @return Input dataframe with starting_income and tax breakdown columns added
 #' @export
@@ -17,6 +19,7 @@ solve_starting_income_iterative <- function(df,
                                             state = NULL,
                                             max_iterations = 100,
                                             tolerance = 1.0,
+                                            damping = 0.5,
                                             debug = FALSE) {
 
   validate_input(df)
@@ -137,7 +140,12 @@ solve_starting_income_iterative <- function(df,
                         pmax(-state_net, 0)
       )
 
-    df$new_starting_income <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
+    raw_new_income         <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
+    df$new_starting_income <- ifelse(
+      df$converged,
+      df$starting_income,
+      damping * df$previous_income + (1 - damping) * raw_new_income
+    )
     df$income_diff         <- abs(df$new_starting_income - df$previous_income)
     df$row_converged       <- df$income_diff < tolerance
     df$final_income_diff   <- df$income_diff
@@ -155,12 +163,11 @@ solve_starting_income_iterative <- function(df,
   non_converged_idx <- which(!df$converged)
   if (length(non_converged_idx) > 0) {
     warning(sprintf(
-      "%d rows (%.2f%%) did not converge after %d iterations. Using fallback.",
+      "%d rows (%.2f%%) did not converge after %d iterations. Last iterative estimate retained.",
       length(non_converged_idx),
       length(non_converged_idx) / nrow(df) * 100,
       max_iterations
     ))
-    df$starting_income[non_converged_idx] <- df$subtotal3[non_converged_idx] * 1.20 * 12
     df$iteration_count[non_converged_idx] <- max_iterations
   }
 

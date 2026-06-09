@@ -234,7 +234,7 @@ test_that("non-converged rows trigger a warning", {
   )
 })
 
-test_that("non-converged rows get fallback starting_income = subtotal3 * 1.20 * 12", {
+test_that("non-converged rows retain last iterative estimate, not the crude heuristic", {
   df <- create_mock_df()
 
   out <- withCallingHandlers(
@@ -244,10 +244,9 @@ test_that("non-converged rows get fallback starting_income = subtotal3 * 1.20 * 
 
   non_conv <- out[!out$converged, ]
   if (nrow(non_conv) > 0) {
-    expected_fallback <- non_conv$subtotal3 * 1.20 * 12
-    expect_equal(non_conv$starting_income, expected_fallback, tolerance = 0.01)
+    expect_false(any(non_conv$starting_income == non_conv$subtotal3 * 1.20 * 12))
   } else {
-    skip("All rows converged — reduce max_iterations or tolerance to test fallback")
+    skip("All rows converged — reduce max_iterations or tolerance to test this path")
   }
 })
 
