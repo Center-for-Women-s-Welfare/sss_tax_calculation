@@ -60,16 +60,19 @@ calculate_tax_from_brackets <- function(df, brackets_df,
 #' `per_person`, `per_adult`, `per_child`, `per_child_minus1`,
 #' `per_child_under6_double`, `per_child_under6`, `per_child_6plus`,
 #' `percent_of_fed_tax`, `percent_of_fed_eitc`, `percent_of_fed_cdctc`.
-#' Any unrecognized method triggers a warning and returns 0.
+#' Any unrecognized method is an error when `strict = TRUE` (the default), or
+#' a warning that returns 0 when `strict = FALSE`.
 #'
 #' @param value_vector Numeric vector of raw parameter values (e.g., joined `value` column)
 #' @param method Single string matching a supported calculation_method
 #' @param calculations_df Dataframe row-aligned with `value_vector`, supplying context
 #'   columns (household_size, adult, children, children_under6, children_6plus,
 #'   final_federal_income_tax, eitc_credit, cdctc_credit)
-#' @param var_name Variable name used in warning messages when the method is unrecognized
+#' @param var_name Variable name used in the error/warning message when the method is unrecognized
+#' @param strict If TRUE (default), an unrecognized `method` triggers `stop()`. If FALSE,
+#'   it triggers a `warning()` and returns 0.
 #' @return Numeric vector the same length as `value_vector`
-apply_calculation_method <- function(value_vector, method, calculations_df, var_name = "unknown") {
+apply_calculation_method <- function(value_vector, method, calculations_df, var_name = "unknown", strict = TRUE) {
   v <- dplyr::coalesce(value_vector, 0)
   if (method %in% c("fixed", "flat", "flag")) {
     v
@@ -95,6 +98,8 @@ apply_calculation_method <- function(value_vector, method, calculations_df, var_
     v * calculations_df$eitc_credit
   } else if (method == "percent_of_fed_cdctc") {
     v * calculations_df$cdctc_credit
+  } else if (strict) {
+    stop(glue::glue("Unknown calculation_method '{method}' for '{var_name}'."))
   } else {
     warning(glue::glue("Unknown calculation_method '{method}' for '{var_name}' -- returning 0."))
     rep(0, length(value_vector))

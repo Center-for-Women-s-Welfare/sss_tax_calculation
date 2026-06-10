@@ -10,6 +10,7 @@ solve_starting_income_iterative(
   state = NULL,
   max_iterations = 100,
   tolerance = 1,
+  damping = 0.5,
   debug = FALSE
 )
 }
@@ -24,6 +25,9 @@ solve_starting_income_iterative(
 \item{max_iterations}{Maximum number of solver iterations (default: 100)}
 
 \item{tolerance}{Convergence threshold in dollars (default: 1.0)}
+
+\item{damping}{Blending weight applied to the previous estimate on each step (0 = no damping,
+1 = never moves). Default 0.5 blends equally, which stabilises oscillation near credit cliffs.}
 
 \item{debug}{If TRUE, print iteration progress and diagnostics}
 }

@@ -8,7 +8,8 @@ apply_calculation_method(
   value_vector,
   method,
   calculations_df,
-  var_name = "unknown"
+  var_name = "unknown",
+  strict = TRUE
 )
 }
 \arguments{
@@ -20,7 +21,10 @@ apply_calculation_method(
 columns (household_size, adult, children, children_under6, children_6plus,
 final_federal_income_tax, eitc_credit, cdctc_credit)}
 
-\item{var_name}{Variable name used in warning messages when the method is unrecognized}
+\item{var_name}{Variable name used in the error/warning message when the method is unrecognized}
+
+\item{strict}{If TRUE (default), an unrecognized \code{method} triggers \code{stop()}. If FALSE,
+it triggers a \code{warning()} and returns 0.}
 }
 \value{
 Numeric vector the same length as \code{value_vector}
@@ -37,5 +41,6 @@ Supported methods: \code{fixed} / \code{flat} / \code{flag} (return value as-is)
 \code{per_person}, \code{per_adult}, \code{per_child}, \code{per_child_minus1},
 \code{per_child_under6_double}, \code{per_child_under6}, \code{per_child_6plus},
 \code{percent_of_fed_tax}, \code{percent_of_fed_eitc}, \code{percent_of_fed_cdctc}.
-Any unrecognized method triggers a warning and returns 0.
+Any unrecognized method is an error when \code{strict = TRUE} (the default), or
+a warning that returns 0 when \code{strict = FALSE}.
 }
