@@ -48,6 +48,64 @@ calculate_tax_from_brackets <- function(df, brackets_df,
     select(-row_id)
 }
 
+#' Apply a Calculation Method to a Value Vector
+#'
+#' Transforms a vector of raw parameter values (typically joined from a tax
+#' parameter CSV) into per-row computed amounts by applying one of the
+#' supported `calculation_method` strings. This is the shared dispatch function
+#' used by both state taxable-income adjustment logic and state credit logic --
+#' any new method needed by a state's CSV data should be added here.
+#'
+#' Supported methods: `fixed` / `flat` / `flag` (return value as-is),
+#' `per_person`, `per_adult`, `per_child`, `per_child_minus1`,
+#' `per_child_under6_double`, `per_child_under6`, `per_child_6plus`,
+#' `percent_of_fed_tax`, `percent_of_fed_eitc`, `percent_of_fed_cdctc`.
+#' Any unrecognized method is an error when `strict = TRUE` (the default), or
+#' a warning that returns 0 when `strict = FALSE`.
+#'
+#' @param value_vector Numeric vector of raw parameter values (e.g., joined `value` column)
+#' @param method Single string matching a supported calculation_method
+#' @param calculations_df Dataframe row-aligned with `value_vector`, supplying context
+#'   columns (household_size, adult, children, children_under6, children_6plus,
+#'   final_federal_income_tax, eitc_credit, cdctc_credit)
+#' @param var_name Variable name used in the error/warning message when the method is unrecognized
+#' @param strict If TRUE (default), an unrecognized `method` triggers `stop()`. If FALSE,
+#'   it triggers a `warning()` and returns 0.
+#' @return Numeric vector the same length as `value_vector`
+apply_calculation_method <- function(value_vector, method, calculations_df, var_name = "unknown", strict = TRUE) {
+  v <- dplyr::coalesce(value_vector, 0)
+  if (method %in% c("fixed", "flat", "flag")) {
+    v
+  } else if (method == "per_person") {
+    v * calculations_df$household_size
+  } else if (method == "per_adult") {
+    v * calculations_df$adult
+  } else if (method == "per_child") {
+    v * calculations_df$children
+  } else if (method == "per_child_minus1") {
+    v * pmax(calculations_df$children - 1, 0)
+  } else if (method == "per_child_under6_double") {
+    num_under6 <- if ("children_under6" %in% names(calculations_df)) calculations_df$children_under6 else 0
+    num_other  <- pmax(calculations_df$children - num_under6, 0)
+    v * (2 * num_under6 + num_other)
+  } else if (method == "per_child_under6") {
+    v * calculations_df$children_under6
+  } else if (method == "per_child_6plus") {
+    v * calculations_df$children_6plus
+  } else if (method == "percent_of_fed_tax") {
+    v * dplyr::coalesce(calculations_df$final_federal_income_tax, 0)
+  } else if (method == "percent_of_fed_eitc") {
+    v * calculations_df$eitc_credit
+  } else if (method == "percent_of_fed_cdctc") {
+    v * calculations_df$cdctc_credit
+  } else if (strict) {
+    stop(glue::glue("Unknown calculation_method '{method}' for '{var_name}'."))
+  } else {
+    warning(glue::glue("Unknown calculation_method '{method}' for '{var_name}' -- returning 0."))
+    rep(0, length(value_vector))
+  }
+}
+
 # ============================================================================
 # FEDERAL TAX FUNCTIONS
 # ============================================================================
@@ -105,9 +163,8 @@ calculate_federal_payroll_taxes <- function(calculations_df, tax_fed_payroll_df,
 
   calculations_df$total_fed_payroll_tax <-
     ifelse(calculations_df$household_type == "married",
-           calculations_df$ss_tax * 2,
-           calculations_df$ss_tax) +
-    calculations_df$medicare_tax
+           (calculations_df$ss_tax + calculations_df$medicare_tax) * 2,
+           calculations_df$ss_tax + calculations_df$medicare_tax)
 
   return(calculations_df)
 }
@@ -281,15 +338,23 @@ calculate_federal_income_tax <- function(df, federal_standard_deduction) {
 
 #' Calculate Final Federal Income Tax
 #'
-#' Applies non-refundable and refundable credits to calculate final federal tax liability.
+#' Applies credits in statutory order to calculate final federal income tax liability:
+#' (1) CDCTC (non-refundable) against gross tax, (2) non-refundable CTC against remaining
+#' tax, (3) refundable credits (CTC refundable + EITC) against remaining liability.
 #'
-#' @param df Dataframe with federal_cumulative_tax, cdctc_credit, ctc_refundable, eitc_credit
-#' @return Dataframe with final federal income tax calculation columns added
+#' @param df Dataframe with federal_cumulative_tax, cdctc_credit, ctc_nonrefundable,
+#'   ctc_refundable, eitc_credit
+#' @return Dataframe with final federal income tax calculation columns added:
+#'   fed_cdctc_applied, federal_tax_after_cdctc, fed_ctc_nonrefundable_applied,
+#'   federal_tax_after_nonrefundable, federal_total_refundable_credits,
+#'   federal_tax_liability_with_refund, final_federal_income_tax
 calculate_final_federal_income_tax <- function(df) {
   df %>%
     mutate(
-      fed_nonrefundable_credit_applied  = pmin(cdctc_credit, federal_cumulative_tax),
-      federal_tax_after_nonrefundable   = pmax(federal_cumulative_tax - fed_nonrefundable_credit_applied, 0),
+      fed_cdctc_applied                 = pmin(cdctc_credit, federal_cumulative_tax),
+      federal_tax_after_cdctc           = pmax(federal_cumulative_tax - fed_cdctc_applied, 0),
+      fed_ctc_nonrefundable_applied     = pmin(ctc_nonrefundable, federal_tax_after_cdctc),
+      federal_tax_after_nonrefundable   = pmax(federal_tax_after_cdctc - fed_ctc_nonrefundable_applied, 0),
       federal_total_refundable_credits  = ctc_refundable + eitc_credit,
       federal_tax_liability_with_refund = federal_tax_after_nonrefundable - federal_total_refundable_credits,
       final_federal_income_tax          = pmax(federal_tax_liability_with_refund, 0)

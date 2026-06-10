@@ -1,0 +1,88 @@
+sss_year,state,applicable,program,variable,value,source,source_url,collected_by,date_collected,checked_by,date_checked,complete
+2026,AK,TRUE,SUI,rate,0.005,Alaska Department of Labor and Workforce Development,https://labor.state.ak.us/estax/newsletters/newsltr0125.pdf,LMa,06/05/2025,NA,NA,NA
+2026,AK,TRUE,SUI,wage_cap,51700,Alaska Department of Labor and Workforce Development,https://labor.state.ak.us/estax/newsletters/newsltr0125.pdf,LMa,06/05/2025,NA,NA,NA
+2026,AL,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,AR,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,AZ,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,CA,TRUE,SDI,rate,0.012,California Employment Development Department (EDD),EDD Contribution Rates,LMa,06/05/2025,NA,NA,NA
+2026,CA,TRUE,SDI,wage_cap,Inf,California Employment Development Department (EDD),EDD Contribution Rates,LMa,06/05/2025,NA,NA,NA
+2026,CO,TRUE,FAMLI,rate,0.0045,Colorado Department of Labor and Employment (CDLE),https://famli.colorado.gov/employers,LMa,06/05/2025,NA,NA,NA
+2026,CO,TRUE,FAMLI,wage_cap,176100,Colorado Department of Labor and Employment (CDLE),https://famli.colorado.gov/employers,LMa,06/05/2025,NA,NA,NA
+2026,CT,TRUE,CTPL,rate,0.005,"Connecticut Paid Leave Authority. Contributions: How CT Paid Leave Works. Accessed May 27, 2025. https://www.ctpaidleave.org/how-ct-paid-leave-works/contributions?language=en_US.",https://www.ctpaidleave.org/how-ct-paid-leave-works/contributions?language=en_US,Aku,06/02/2025,LMa,06/05/2025,complete
+2026,CT,TRUE,CTPL,wage_cap,176100,"Connecticut Paid Leave Authority. Contributions: How CT Paid Leave Works. Accessed May 27, 2025. https://www.ctpaidleave.org/how-ct-paid-leave-works/contributions?language=en_US.",https://www.ctpaidleave.org/how-ct-paid-leave-works/contributions?language=en_US,Aku,06/02/2025,LMa,06/05/2025,complete
+2026,DC,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,DE,TRUE,PL,rate,0.0016,"Delaware Department of Labor. Delaware Paid Leave Benefits Contribution Calculator. Accessed May 27, 2025. https://labor.delaware.gov/delaware-paid-leave-is-coming/.",https://labor.delaware.gov/delaware-paid-leave-is-coming/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,DE,TRUE,PL,wage_cap,176100,"Delaware Department of Labor. Delaware Paid Leave Benefits Contribution Calculator. Accessed May 27, 2025. https://labor.delaware.gov/delaware-paid-leave-is-coming/.",https://labor.delaware.gov/delaware-paid-leave-is-coming/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,DE,TRUE,ML,rate,0.002,"Delaware Department of Labor. Delaware Paid Leave Benefits Contribution Calculator. Accessed May 27, 2025. https://labor.delaware.gov/delaware-paid-leave-is-coming/.",https://labor.delaware.gov/delaware-paid-leave-is-coming/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,DE,TRUE,ML,wage_cap,176100,"Delaware Department of Labor. Delaware Paid Leave Benefits Contribution Calculator. Accessed May 27, 2025. https://labor.delaware.gov/delaware-paid-leave-is-coming/.",https://labor.delaware.gov/delaware-paid-leave-is-coming/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,DE,TRUE,FCL,rate,4e-4,"Delaware Department of Labor. Delaware Paid Leave Benefits Contribution Calculator. Accessed May 27, 2025. https://labor.delaware.gov/delaware-paid-leave-is-coming/.",https://labor.delaware.gov/delaware-paid-leave-is-coming/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,DE,TRUE,FCL,wage_cap,176100,"Delaware Department of Labor. Delaware Paid Leave Benefits Contribution Calculator. Accessed May 27, 2025. https://labor.delaware.gov/delaware-paid-leave-is-coming/.",https://labor.delaware.gov/delaware-paid-leave-is-coming/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,FL,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,GA,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,HI,TRUE,TDI,rate,0.005,"Hawaii Department of Labor and Industrial Relations. 2025 Maximum Weekly Wage Base. Revised March 2025. Accessed May 27, 2025. https://labor.hawaii.gov/dcd/files/2023/05/2025-Max-Weekly-Wage-Base-Rev-2025.03.pdf.",https://labor.hawaii.gov/dcd/files/2023/05/2025-Max-Weekly-Wage-Base-Rev-2025.03.pdf,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,HI,TRUE,TDI,wage_cap,75174.74093,"Hawaii Department of Labor and Industrial Relations. 2025 Maximum Weekly Wage Base. Revised March 2025. Accessed May 27, 2025. https://labor.hawaii.gov/dcd/files/2023/05/2025-Max-Weekly-Wage-Base-Rev-2025.03.pdf.",https://labor.hawaii.gov/dcd/files/2023/05/2025-Max-Weekly-Wage-Base-Rev-2025.03.pdf,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,IA,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,ID,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,IL,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,IN,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,IO,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,KS,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,KY,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,LA,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,MA,TRUE,ML,rate,0.0028,"Commonwealth of Massachusetts. Paid Family and Medical Leave Employer Contribution Rates and Calculator.Accessed May 27, 2025. https://www.mass.gov/info-details/paid-family-and-medical-leave-employer-contribution-rates-and-calculator.",https://www.mass.gov/info-details/paid-family-and-medical-leave-employer-contribution-rates-and-calculator?utm_source=chatgpt.com#overview-,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MA,TRUE,ML,wage_cap,176100,"Commonwealth of Massachusetts. Paid Family and Medical Leave Employer Contribution Rates and Calculator.Accessed May 27, 2025. https://www.mass.gov/info-details/paid-family-and-medical-leave-employer-contribution-rates-and-calculator.",https://www.mass.gov/info-details/paid-family-and-medical-leave-employer-contribution-rates-and-calculator?utm_source=chatgpt.com#overview-,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MA,TRUE,FL,rate,0.0018,"Commonwealth of Massachusetts. Paid Family and Medical Leave Employer Contribution Rates and Calculator.Accessed May 27, 2025. https://www.mass.gov/info-details/paid-family-and-medical-leave-employer-contribution-rates-and-calculator.",https://www.mass.gov/info-details/paid-family-and-medical-leave-employer-contribution-rates-and-calculator?utm_source=chatgpt.com#overview-,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MA,TRUE,FL,wage_cap,176100,"Commonwealth of Massachusetts. Paid Family and Medical Leave Employer Contribution Rates and Calculator.Accessed May 27, 2025. https://www.mass.gov/info-details/paid-family-and-medical-leave-employer-contribution-rates-and-calculator.",https://www.mass.gov/info-details/paid-family-and-medical-leave-employer-contribution-rates-and-calculator?utm_source=chatgpt.com#overview-,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MD,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,ME,TRUE,MDOL,rate,0.005,Maine Department of Labor. Paid Family and Medical Leave (PFML) Frequently Asked Questions (FAQs). April 2025. https://www.maine.gov/paidleave/docs/2025/faq/faqenglish.pdf.,https://www.maine.gov/paidleave/docs/2025/faq/faqenglish.pdf,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,ME,TRUE,MDOL,wage_cap,176100,Maine Department of Labor. Paid Family and Medical Leave (PFML) Frequently Asked Questions (FAQs). April 2025. https://www.maine.gov/paidleave/docs/2025/faq/faqenglish.pdf.,https://www.maine.gov/paidleave/docs/2025/faq/faqenglish.pdf,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MI,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,MN,TRUE,FL,rate,0.00135,"Minnesota Department of Employment and Economic Development. Paid Leave Premiums for Employers. Accessed May 27, 2025. https://mn.gov/deed/paidleave/employers/premiums/.",https://mn.gov/deed/paidleave/employers/premiums/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MN,TRUE,FL,wage_cap,176100,"Minnesota Department of Employment and Economic Development. Paid Leave Premiums for Employers. Accessed May 27, 2025. https://mn.gov/deed/paidleave/employers/premiums/.",https://mn.gov/deed/paidleave/employers/premiums/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MN,TRUE,ML,rate,0.00305,"Minnesota Department of Employment and Economic Development. Paid Leave Premiums for Employers. Accessed May 27, 2025. https://mn.gov/deed/paidleave/employers/premiums/.",https://mn.gov/deed/paidleave/employers/premiums/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MN,TRUE,ML,wage_cap,176100,"Minnesota Department of Employment and Economic Development. Paid Leave Premiums for Employers. Accessed May 27, 2025. https://mn.gov/deed/paidleave/employers/premiums/.",https://mn.gov/deed/paidleave/employers/premiums/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,MO,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,MS,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,MT,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,NC,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,ND,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,NE,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,NH,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,NJ,TRUE,TDI,rate,0.0023,"New Jersey Department of Labor and Workforce Development. “Employer Information: NJ Paid Family and Medical Leave.” MyLeaveBenefits.NJ.gov. Accessed June 2, 2025. https://www.nj.gov/labor/myleavebenefits/employer/index.shtml?open=FLI.",https://www.nj.gov/labor/myleavebenefits/employer/index.shtml?open=FLI,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,NJ,TRUE,TDI,wage_cap,NA,"New Jersey Department of Labor and Workforce Development. “Employer Information: NJ Paid Family and Medical Leave.” MyLeaveBenefits.NJ.gov. Accessed June 2, 2025. https://www.nj.gov/labor/myleavebenefits/employer/index.shtml?open=FLI.",https://www.nj.gov/labor/myleavebenefits/employer/index.shtml?open=FLI,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,NJ,TRUE,FLI,rate,0.0033,"New Jersey Department of Labor and Workforce Development. “Employer Information: NJ Paid Family and Medical Leave.” MyLeaveBenefits.NJ.gov. Accessed June 2, 2025. https://www.nj.gov/labor/myleavebenefits/employer/index.shtml?open=FLI.",https://www.nj.gov/labor/myleavebenefits/employer/index.shtml?open=FLI,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,NJ,TRUE,FLI,wage_cap,NA,"New Jersey Department of Labor and Workforce Development. “Employer Information: NJ Paid Family and Medical Leave.” MyLeaveBenefits.NJ.gov. Accessed June 2, 2025. https://www.nj.gov/labor/myleavebenefits/employer/index.shtml?open=FLI.",https://www.nj.gov/labor/myleavebenefits/employer/index.shtml?open=FLI,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,NJ,TRUE,UI,rate,0.003825,"New Jersey Department of Labor and Workforce Development. “Employer Contributions and Tax Rates.” NJ.gov. Accessed June 2, 2025. https://www.nj.gov/labor/ea/employer-services/rate-info/.",https://www.nj.gov/labor/ea/employer-services/rate-info/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,NJ,TRUE,UI,wage_cap,43300,"New Jersey Department of Labor and Workforce Development. “Employer Contributions and Tax Rates.” NJ.gov. Accessed June 2, 2025. https://www.nj.gov/labor/ea/employer-services/rate-info/.",https://www.nj.gov/labor/ea/employer-services/rate-info/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,NJ,TRUE,WFSWF,rate,4.25e-4,"New Jersey Department of Labor and Workforce Development. “Employer Contributions and Tax Rates.” NJ.gov. Accessed June 2, 2025. https://www.nj.gov/labor/ea/employer-services/rate-info/.",https://www.nj.gov/labor/ea/employer-services/rate-info/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,NJ,TRUE,WFSWF,wage_cap,43300,"New Jersey Department of Labor and Workforce Development. “Employer Contributions and Tax Rates.” NJ.gov. Accessed June 2, 2025. https://www.nj.gov/labor/ea/employer-services/rate-info/.",https://www.nj.gov/labor/ea/employer-services/rate-info/,Aku,06/02/2025,LMa,06/05/2025,NA
+2026,NM,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,NV,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,NY,TRUE,PFL,rate,0.00388,"New York State Paid Family Leave. “Cost.” PaidFamilyLeave.ny.gov. Accessed June 2, 2025. https://paidfamilyleave.ny.gov/cost.",https://paidfamilyleave.ny.gov/cost,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,NY,TRUE,PFL,wage_cap,91300,"New York State Paid Family Leave. “Cost.” PaidFamilyLeave.ny.gov. Accessed June 2, 2025. https://paidfamilyleave.ny.gov/cost.",https://paidfamilyleave.ny.gov/cost,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,NY,TRUE,SDI,rate,0.005,"New York State Workers’ Compensation Board. “Disability Benefits for Employees.” WCB.NY.gov. Accessed June 2, 2025. https://www.wcb.ny.gov/content/main/DisabilityBenefits/employee-disability-benefits.jsp.",https://www.wcb.ny.gov/content/main/DisabilityBenefits/employee-disability-benefits.jsp.,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,NY,TRUE,SDI,wage_cap,6257.088,"New York State Workers’ Compensation Board. “Disability Benefits for Employees.” WCB.NY.gov. Accessed June 2, 2025. https://www.wcb.ny.gov/content/main/DisabilityBenefits/employee-disability-benefits.jsp.",https://www.wcb.ny.gov/content/main/DisabilityBenefits/employee-disability-benefits.jsp.,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,OH,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,OK,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,OR,TRUE,PL,rate,0.006,"Paid Leave Oregon. “Common Questions.” Oregon.gov. Accessed June 2, 2025. https://paidleave.oregon.gov/resources/common-questions.html.",https://paidleave.oregon.gov/resources/common-questions.html.,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,OR,TRUE,PL,wage_cap,176100,"Paid Leave Oregon. “Common Questions.” Oregon.gov. Accessed June 2, 2025. https://paidleave.oregon.gov/resources/common-questions.html.",https://paidleave.oregon.gov/resources/common-questions.html.,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,OR,TRUE,WBF,flat_tax,21.12,"Oregon Department of Consumer and Business Services. Workers’ Compensation Rate Notice for 2025. Salem, OR: DCBS, 2023. https://www.oregon.gov/DCBS/reports/cost/Documents/workers-compensation-rate-notice-for-2025.pdf.",https://www.oregon.gov/DCBS/reports/cost/Documents/workers-compensation-rate-notice-for-2025.pdf?utm_source=chatgpt.com,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,PA,TRUE,UC,rate,7e-4,"Pennsylvania Department of Labor and Industry. “Yearly Tax Highlights.” Accessed June 3, 2025. https://www.pa.gov/agencies/dli/resources/for-employers-and-educators/how-to-file/uc-tax/yearly-tax-highlights.html",https://www.pa.gov/agencies/dli/resources/for-employers-and-educators/how-to-file/uc-tax/yearly-tax-highlights.html,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,PA,TRUE,UC,wage_cap,Inf,"Pennsylvania Department of Labor and Industry. “Yearly Tax Highlights.” Accessed June 3, 2025. https://www.pa.gov/agencies/dli/resources/for-employers-and-educators/how-to-file/uc-tax/yearly-tax-highlights.html",https://www.pa.gov/agencies/dli/resources/for-employers-and-educators/how-to-file/uc-tax/yearly-tax-highlights.html,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,RI,TRUE,TDI,rate,0.013,"Rhode Island Department of Labor and Training. Temporary Disability and Caregiver Insurance for Employers. Accessed June 3, 2025. https://dlt.ri.gov/individuals/temporary-disability-caregiver-insurance/employers.",https://dlt.ri.gov/media/13506/download?language=en,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,RI,TRUE,TDI,wage_cap,89200,"Rhode Island Department of Labor and Training. Temporary Disability and Caregiver Insurance for Employers. Accessed June 3, 2025. https://dlt.ri.gov/individuals/temporary-disability-caregiver-insurance/employers.",NA,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,SC,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,SD,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,TN,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,TX,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,UT,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,VA,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,VT,TRUE,CCC,rate,0.0011,"Vermont Department of Taxes. Child Care Contribution. Accessed June 3, 2025. https://tax.vermont.gov/business/child-care-contribution.",https://tax.vermont.gov/business/child-care-contribution,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,VT,TRUE,CCC,wage_cap,Inf,"Vermont Department of Taxes. Child Care Contribution. Accessed June 3, 2025. https://tax.vermont.gov/business/child-care-contribution.",https://tax.vermont.gov/business/child-care-contribution,Aku,06/03/2025,LMa,06/05/2025,NA
+2026,WA,TRUE,PFML,rate,0.0066,Washington Employment Security Department (ESD),ESD Updates,LMa,06/05/2025,NA,NA,NA
+2026,WA,TRUE,PFML,wage_cap,176100,Washington Employment Security Department (ESD),ESD Updates,LMa,06/05/2025,NA,NA,NA
+2026,WA,TRUE,WA_Cares,rate,0.0058,WA Cares Fund,WA Cares How It Works,LMa,06/05/2025,NA,NA,NA
+2026,WA,TRUE,WA_Cares,wage_cap,Inf,WA Cares Fund,WA Cares How It Works,LMa,06/05/2025,NA,NA,NA
+2026,WI,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,WV,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+2026,WY,Unconfirmed,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA

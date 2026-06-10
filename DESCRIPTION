@@ -17,8 +17,13 @@ Depends:
     R (>= 4.0.0)
 Imports:
     dplyr (>= 1.1.0),
+    fuzzyjoin,
+    glue,
+    readr,
+    rlang,
     tidyr,
-    readr
+    tidyselect,
+    utils
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
