@@ -115,6 +115,7 @@ solve_starting_income_iterative <- function(df,
       df <- calculate_state_tax_credits(df, state_params$state_credits,
                                         state_params$state_variable_brackets,
                                         state_eitc_lookup,
+                                        state_params$state_eitc_params,
                                         year, state, debug)
     }
 

@@ -337,8 +337,8 @@ calculate_state_taxable_income <- function(calculations_df,
 #' value is resolved via [apply_calculation_method()].
 #'
 #' Also dispatches to special-case credit formulas (CA EITC, CA Young Child
-#' Tax Credit, IA combined childcare credit cap) when the state's
-#' `calculation_method` contains a `special_*` indicator.
+#' Tax Credit, WA Working Families Tax Credit, IA combined childcare credit
+#' cap) when the state's `calculation_method` contains a `special_*` indicator.
 #'
 #' @param calculations_df Dataframe with starting_income, household_type,
 #'   children, child_care_cost, eitc_credit, and related columns
@@ -348,10 +348,13 @@ calculate_state_taxable_income <- function(calculations_df,
 #'   parameters already filtered to the target year and state
 #' @param state_eitc_lookup Pre-built state EITC lookup list from
 #'   `build_state_eitc_lookup()`, constructed before the solver loop
+#' @param state_eitc_params State EITC-style credit parameters (e.g., WA WFTC)
+#'   already filtered to year/state, passed through to
+#'   [apply_state_eitc_style_credit()]
 #' @param year Tax year, used only in the diagnostic message when no credits
 #'   are found
 #' @param state State postal code, used for diagnostic messaging and
-#'   special-case dispatch (e.g., "IA", "CA")
+#'   special-case dispatch (e.g., "IA", "CA", "WA")
 #' @param debug If TRUE, print a summary of computed credit columns and totals
 #' @return Dataframe with per-credit `credit_<name>` columns plus
 #'   `state_nonrefundable_credits` and `state_refundable_credits` totals added
@@ -359,6 +362,7 @@ calculate_state_tax_credits <- function(calculations_df,
                                         tax_state_credits_df,
                                         tax_state_variable_brackets_df,
                                         state_eitc_lookup,
+                                        state_eitc_params,
                                         year,
                                         state,
                                         debug = FALSE) {
@@ -529,10 +533,19 @@ calculate_state_tax_credits <- function(calculations_df,
       dplyr::mutate(state_refundable_credits = state_refundable_credits + credit_young_child_tax_credit)
   }
 
+  if ("special_wa_wftc" %in% state_credits$calculation_method) {
+    calculations_df <- apply_state_eitc_style_credit(
+      calculations_df  = calculations_df,
+      state_eitc_params = state_eitc_params
+    )
+    calculations_df <- calculations_df %>%
+      dplyr::mutate(state_refundable_credits = state_refundable_credits + credit_wftc)
+  }
+
   # Special-case overrides (IA combined credit cap rule)
   calculations_df <- apply_IA_credit_max_rule(calculations_df, state)
 
-  expected_cols <- paste0("credit_", tolower(credit_vars))
+  expected_cols <- if (length(credit_vars) == 0L) character(0) else paste0("credit_", tolower(credit_vars))
   missing <- setdiff(expected_cols, names(calculations_df))
   if (length(missing) > 0) {
     warning(glue::glue(
