@@ -34,8 +34,8 @@ load_federal_tax_params <- function(year) {
 #'
 #' @param year Tax year (e.g., 2026)
 #' @param state State postal code (e.g., "IA")
-#' @return Named list with six dataframes: state_brackets, state_credits, state_payroll,
-#'   state_ti_adjustments, state_variable_brackets, state_eitc_lookup
+#' @return Named list with seven dataframes: state_brackets, state_credits, state_payroll,
+#'   state_ti_adjustments, state_variable_brackets, state_eitc_lookup, state_eitc_params
 load_state_tax_params <- function(year, state) {
 
   state_tax_dir <- system.file("extdata", "state", as.character(year),
@@ -59,6 +59,7 @@ load_state_tax_params <- function(year, state) {
     state_payroll           = readr::read_csv(file.path(state_tax_dir, "tax_state_payroll.csv"),          show_col_types = FALSE) %>% filter_to_year_state(),
     state_ti_adjustments    = readr::read_csv(file.path(state_tax_dir, "tax_state_ti_adjustments.csv"),   show_col_types = FALSE) %>% filter_to_year_state(),
     state_variable_brackets = readr::read_csv(file.path(state_tax_dir, "tax_state_variable_brackets.csv"), show_col_types = FALSE) %>% filter_to_year_state(),
-    state_eitc_lookup       = readr::read_csv(file.path(state_tax_dir, "tax_state_eitc_lookup.csv"),      show_col_types = FALSE) %>% filter_to_year_state()
+    state_eitc_lookup       = readr::read_csv(file.path(state_tax_dir, "tax_state_eitc_lookup.csv"),      show_col_types = FALSE) %>% filter_to_year_state(),
+    state_eitc_params       = readr::read_csv(file.path(state_tax_dir, "tax_state_eitc_params.csv"),      show_col_types = FALSE) %>% filter_to_year_state()
   )
 }

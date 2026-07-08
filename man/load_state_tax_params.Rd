@@ -12,8 +12,8 @@ load_state_tax_params(year, state)
 \item{state}{State postal code (e.g., "IA")}
 }
 \value{
-Named list with six dataframes: state_brackets, state_credits, state_payroll,
-state_ti_adjustments, state_variable_brackets, state_eitc_lookup
+Named list with seven dataframes: state_brackets, state_credits, state_payroll,
+state_ti_adjustments, state_variable_brackets, state_eitc_lookup, state_eitc_params
 }
 \description{
 Loads all state tax parameter CSVs for a specific year and state from the
