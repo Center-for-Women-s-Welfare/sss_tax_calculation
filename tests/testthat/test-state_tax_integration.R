@@ -61,3 +61,21 @@ test_that("WA state payroll taxes are applied (starting_income differs from fede
   # WA has PFML and WA_Cares payroll taxes so starting_income should be higher
   expect_true(all(out_wa$starting_income >= out_fed$starting_income))
 })
+
+test_that("WA WFTC credit is present and non-zero for a low-income family with children", {
+  df <- data.frame(
+    household_type      = "single_parent",
+    adult               = 1L,
+    children            = 1L,
+    subtotal2           = 2600,
+    subtotal3           = 2650,
+    child_care_cost     = 500,
+    health_ins_premium  = 150,
+    county_table_number = "5306100000_1",
+    public_transit_cost = 0,
+    stringsAsFactors    = FALSE
+  )
+  out <- solve_starting_income_iterative(df, year = YEAR, state = "WA")
+  expect_true("credit_wftc" %in% names(out))
+  expect_true(all(out$credit_wftc > 0))
+})

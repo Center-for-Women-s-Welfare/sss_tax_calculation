@@ -9,6 +9,7 @@ calculate_state_tax_credits(
   tax_state_credits_df,
   tax_state_variable_brackets_df,
   state_eitc_lookup,
+  state_eitc_params,
   year,
   state,
   debug = FALSE
@@ -27,11 +28,15 @@ parameters already filtered to the target year and state}
 \item{state_eitc_lookup}{Pre-built state EITC lookup list from
 \code{build_state_eitc_lookup()}, constructed before the solver loop}
 
+\item{state_eitc_params}{State EITC-style credit parameters (e.g., WA WFTC)
+already filtered to year/state, passed through to
+\code{\link[=apply_state_eitc_style_credit]{apply_state_eitc_style_credit()}}}
+
 \item{year}{Tax year, used only in the diagnostic message when no credits
 are found}
 
 \item{state}{State postal code, used for diagnostic messaging and
-special-case dispatch (e.g., "IA", "CA")}
+special-case dispatch (e.g., "IA", "CA", "WA")}
 
 \item{debug}{If TRUE, print a summary of computed credit columns and totals}
 }
@@ -48,6 +53,6 @@ value is resolved via \code{\link[=apply_calculation_method]{apply_calculation_m
 }
 \details{
 Also dispatches to special-case credit formulas (CA EITC, CA Young Child
-Tax Credit, IA combined childcare credit cap) when the state's
-\code{calculation_method} contains a \verb{special_*} indicator.
+Tax Credit, WA Working Families Tax Credit, IA combined childcare credit
+cap) when the state's \code{calculation_method} contains a \verb{special_*} indicator.
 }

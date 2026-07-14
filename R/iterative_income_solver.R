@@ -115,6 +115,7 @@ solve_starting_income_iterative <- function(df,
       df <- calculate_state_tax_credits(df, state_params$state_credits,
                                         state_params$state_variable_brackets,
                                         state_eitc_lookup,
+                                        state_params$state_eitc_params,
                                         year, state, debug)
     }
 
@@ -124,12 +125,16 @@ solve_starting_income_iterative <- function(df,
     } else {
       df$state_payroll_tax              <- 0
       df$state_tax_liability_with_refund <- 0
+      df$state_refundable_credits        <- 0
     }
 
     df <- df %>%
       dplyr::mutate(
         federal_net = coalesce(federal_tax_liability_with_refund, 0),
-        state_net   = coalesce(state_tax_liability_with_refund, 0),
+        state_net   = coalesce(
+          state_tax_liability_with_refund,
+          -coalesce(state_refundable_credits, 0)  # no income tax but refundable credits exist
+        ),
         total_taxes   = coalesce(total_fed_payroll_tax, 0) +
                         coalesce(state_payroll_tax, 0) +
                         pmax(federal_net, 0) +

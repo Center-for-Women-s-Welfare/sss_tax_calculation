@@ -226,6 +226,56 @@ apply_CA_yctc <- function(calculations_df, tax_state_credits_df) {
     )
 }
 
+#' Apply State EITC-Style Credit (e.g., WA Working Families Tax Credit)
+#'
+#' Computes a refundable, EITC-style credit for states (e.g., WA's Working
+#' Families Tax Credit) that define their credit via flat per-family-type
+#' parameters rather than income brackets. The credit is `max_credit` up to
+#' `phase_out_start`, then phases out linearly at `phase_out_rate` per dollar
+#' of income above that threshold, floored at `min_credit` through
+#' `phase_out_end`; above `phase_out_end` the credit is $0.
+#'
+#' @param calculations_df Dataframe with household_type, children, and
+#'   starting_income
+#' @param state_eitc_params State EITC-style credit parameters already
+#'   filtered to year/state, with filing_status, children, max_credit,
+#'   phase_out_start, phase_out_end, phase_out_rate, and min_credit columns
+#' @return Dataframe with `credit_wftc` column added
+apply_state_eitc_style_credit <- function(calculations_df, state_eitc_params) {
+  if (nrow(state_eitc_params) == 0L) {
+    return(calculations_df %>% dplyr::mutate(credit_wftc = 0))
+  }
+
+  params <- state_eitc_params %>%
+    dplyr::mutate(children = pmin(children, 3L)) %>%
+    dplyr::select(filing_status, children, max_credit, phase_out_start,
+                  phase_out_end, phase_out_rate, min_credit)
+
+  calculations_df %>%
+    dplyr::mutate(
+      wftc_filing_status = dplyr::if_else(household_type == "married", "married", "single"),
+      wftc_children      = pmin(children, 3L)
+    ) %>%
+    dplyr::left_join(
+      params,
+      by           = c("wftc_filing_status" = "filing_status", "wftc_children" = "children"),
+      relationship = "many-to-one"
+    ) %>%
+    dplyr::mutate(
+      credit_wftc = dplyr::case_when(
+        is.na(max_credit)                  ~ 0,
+        starting_income <= phase_out_start  ~ max_credit,
+        starting_income >  phase_out_end    ~ 0,
+        TRUE ~ pmax(
+          max_credit - phase_out_rate * (starting_income - phase_out_start),
+          min_credit
+        )
+      )
+    ) %>%
+    dplyr::select(-wftc_filing_status, -wftc_children, -max_credit,
+                  -phase_out_start, -phase_out_end, -phase_out_rate, -min_credit)
+}
+
 
 # ---------- CREDIT RESOLUTION HELPER --------------------------------
 
