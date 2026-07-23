@@ -1,19 +1,16 @@
 # validation.R
 # Input validation functions for SSS Tax Calculation Engine
 
-#' Validate Input Dataframe
+#' Validate input dataframe and required derived columns
 #'
-#' Checks that the input dataframe has all required columns and valid data
-#'
-#' @param df Input dataframe (calculations_df with basic needs)
-#' @return TRUE if valid, stops with error message if invalid
-validate_input <- function(df) {
-
-  if (!is.data.frame(df)) {
-    stop("Input must be a data frame, got: ", class(df))
-  }
-  
-  # Required columns for tax calculations
+#' @param df Input calculations dataframe
+#' @param year Tax year
+#' @param state State abbreviation (optional)
+#' @param methods_present Character vector of calculation_method values found in
+#'   loaded tax parameter tables. If NULL, only base required columns are checked.
+#' @return Invisibly TRUE; errors if required columns are missing.
+validate_input <- function(df, year, state = NULL, methods_present = NULL) {
+  # Always-required columns (existing behavior)
   required_cols <- c(
     # Subtotals
     "subtotal2", "subtotal3",
@@ -25,16 +22,72 @@ validate_input <- function(df) {
     "county_table_number"
   )
   
-  # Check for missing columns
-  missing_cols <- setdiff(required_cols, names(df))
-  if (length(missing_cols) > 0) {
-    stop(paste(
-      "Missing required columns:",
-      paste(missing_cols, collapse = ", "),
-      "\nEnsure basic needs calculations have been completed."
-    ))
+  # Conditional requirements keyed by apply_calculation_method branches
+  method_required_cols <- list(
+    per_person              = c("household_size"),
+    per_adult               = c("adult"),
+    per_child               = c("children"),
+    per_child_minus1        = c("children"),
+    per_child_under6_double = c("children", "children_under6"),
+    per_child_under6        = c("children_under6"),
+    per_child_6plus         = c("children_6plus"),
+    percent_of_fed_tax      = c("final_federal_income_tax"),
+    percent_of_fed_eitc     = c("eitc_credit"),
+    percent_of_fed_cdctc    = c("cdctc_credit")
+  )
+  
+  methods_present <- unique(as.character(methods_present)[!is.na(methods_present)])
+  
+  conditional_cols <- character(0)
+  if (length(methods_present) > 0) {
+    matched_methods <- intersect(methods_present, names(method_required_cols))
+    if (length(matched_methods) > 0) {
+      conditional_cols <- unique(unlist(method_required_cols[matched_methods], use.names = FALSE))
+    }
   }
   
+  all_required_cols <- unique(c(required_cols, conditional_cols))
+  missing_cols <- setdiff(all_required_cols, names(df))
+  
+  if (length(missing_cols) > 0) {
+    missing_base <- intersect(missing_cols, required_cols)
+    missing_cond <- setdiff(missing_cols, required_cols)
+    
+    msg <- c(
+      sprintf(
+        "Input dataframe is missing required column(s): %s",
+        paste(missing_cols, collapse = ", ")
+      )
+    )
+    
+    if (length(missing_base) > 0) {
+      msg <- c(msg, sprintf("Base required missing: %s", paste(missing_base, collapse = ", ")))
+    }
+    
+    if (length(missing_cond) > 0) {
+      # helpful method->missing map
+      matched_methods <- intersect(methods_present, names(method_required_cols))
+      by_method <- vapply(
+        matched_methods,
+        function(m) {
+          miss <- intersect(method_required_cols[[m]], missing_cond)
+          if (!length(miss)) return(NA_character_)
+          sprintf("%s -> %s", m, paste(miss, collapse = ", "))
+        },
+        character(1)
+      )
+      by_method <- by_method[!is.na(by_method)]
+      if (length(by_method) > 0) {
+        msg <- c(
+          msg,
+          sprintf("Method-dependent missing: %s", paste(missing_cond, collapse = ", ")),
+          sprintf("Triggered by methods: %s", paste(by_method, collapse = " | "))
+        )
+      }
+    }
+    
+    stop(paste(msg, collapse = "\n"), call. = FALSE)
+  }
   # Check for NA values in critical columns
   critical_cols <- c("subtotal2", "subtotal3", "household_type")
   for (col in critical_cols) {
@@ -84,5 +137,5 @@ validate_input <- function(df) {
     ))
   }
   
-  return(TRUE)
-}
+  invisible(TRUE)
+}  
