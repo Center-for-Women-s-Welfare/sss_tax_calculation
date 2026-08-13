@@ -7,7 +7,10 @@
 calculate_federal_payroll_taxes(calculations_df, tax_fed_payroll_df, year)
 }
 \arguments{
-\item{calculations_df}{Dataframe with starting_income and household_type}
+\item{calculations_df}{Dataframe with starting_income, household_type, and
+(optionally) n_earning_adults -- the number of adults whose income is
+earned. If absent, defaults to n_adults (all adults earning), matching
+prior behavior exactly.}
 
 \item{tax_fed_payroll_df}{Dataframe with federal payroll tax parameters}
 
@@ -17,5 +20,8 @@ calculate_federal_payroll_taxes(calculations_df, tax_fed_payroll_df, year)
 Dataframe with ss_tax, medicare_tax, and total_fed_payroll_tax columns added
 }
 \description{
-Calculates Social Security and Medicare taxes
+Calculates Social Security and Medicare taxes. Income is split evenly
+across \code{n_adults}, but payroll tax is only charged on the
+\code{n_earning_adults} share of that split -- adults whose income is unearned
+(e.g. SS/SSDI, gap-filling retirement income) owe no payroll tax on it.
 }

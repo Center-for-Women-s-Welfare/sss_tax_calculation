@@ -7,8 +7,8 @@
 apply_state_eitc_style_credit(calculations_df, state_eitc_params)
 }
 \arguments{
-\item{calculations_df}{Dataframe with household_type, children, and
-starting_income}
+\item{calculations_df}{Dataframe with household_type, children,
+starting_income, and (optionally) n_earning_adults}
 
 \item{state_eitc_params}{State EITC-style credit parameters already
 filtered to year/state, with filing_status, children, max_credit,
@@ -24,4 +24,9 @@ parameters rather than income brackets. The credit is \code{max_credit} up to
 \code{phase_out_start}, then phases out linearly at \code{phase_out_rate} per dollar
 of income above that threshold, floored at \code{min_credit} through
 \code{phase_out_end}; above \code{phase_out_end} the credit is $0.
+}
+\details{
+Like the federal EITC it's modeled on, this is an earned-income credit --
+gated to $0 when \code{n_earning_adults == 0} (default: \code{n_adults}, i.e. all
+adults earning, if the column is absent, matching prior behavior exactly).
 }

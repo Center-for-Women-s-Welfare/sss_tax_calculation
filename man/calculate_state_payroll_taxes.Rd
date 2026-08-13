@@ -12,7 +12,8 @@ calculate_state_payroll_taxes(
 )
 }
 \arguments{
-\item{calculations_df}{Dataframe with starting_income and household_type}
+\item{calculations_df}{Dataframe with starting_income, household_type, and
+(optionally) n_earning_adults}
 
 \item{tax_state_payroll_df}{Dataframe of state payroll parameters already
 filtered to the target year and state (program, variable, value columns)}
@@ -29,5 +30,11 @@ Dataframe with one \verb{payroll_tax_<program>} column per program plus a
 Applies all state-level payroll tax programs (e.g., SUI, WBF) found in
 \code{tax_state_payroll_df}, summing per-program taxes into a \code{state_payroll_tax}
 total. Married households split income in half before applying program rates,
-matching federal payroll tax treatment.
+matching federal payroll tax treatment. Rate-based programs are scaled by
+\code{n_earning_adults / n_adults} so a non-earning adult's income share owes no
+state payroll tax; flat-dollar programs (e.g. OR's WBF) are zeroed out only
+when the whole household is non-earning, since a flat per-program assessment
+doesn't scale by a fractional earner count the way a rate-based tax does. If
+\code{n_earning_adults} is absent, it defaults to \code{n_adults} (all adults earning),
+which reproduces prior output exactly.
 }

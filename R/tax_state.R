@@ -60,9 +60,16 @@ calculate_program_tax <- function(income, rate, cap) {
 #' Applies all state-level payroll tax programs (e.g., SUI, WBF) found in
 #' `tax_state_payroll_df`, summing per-program taxes into a `state_payroll_tax`
 #' total. Married households split income in half before applying program rates,
-#' matching federal payroll tax treatment.
+#' matching federal payroll tax treatment. Rate-based programs are scaled by
+#' `n_earning_adults / n_adults` so a non-earning adult's income share owes no
+#' state payroll tax; flat-dollar programs (e.g. OR's WBF) are zeroed out only
+#' when the whole household is non-earning, since a flat per-program assessment
+#' doesn't scale by a fractional earner count the way a rate-based tax does. If
+#' `n_earning_adults` is absent, it defaults to `n_adults` (all adults earning),
+#' which reproduces prior output exactly.
 #'
-#' @param calculations_df Dataframe with starting_income and household_type
+#' @param calculations_df Dataframe with starting_income, household_type, and
+#'   (optionally) n_earning_adults
 #' @param tax_state_payroll_df Dataframe of state payroll parameters already
 #'   filtered to the target year and state (program, variable, value columns)
 #' @param year Tax year, used only in the diagnostic message when no programs are found
@@ -81,6 +88,11 @@ calculate_state_payroll_taxes <- function(calculations_df, tax_state_payroll_df,
 
   programs <- unique(state_params$program)
 
+  calculations_df$n_adults <- ifelse(calculations_df$household_type == "married", 2, 1)
+  if (!"n_earning_adults" %in% names(calculations_df)) {
+    calculations_df$n_earning_adults <- calculations_df$n_adults
+  }
+
   calculations_df <- calculations_df %>% dplyr::mutate(state_payroll_tax = 0)
 
   for (program in programs) {
@@ -93,12 +105,17 @@ calculate_state_payroll_taxes <- function(calculations_df, tax_state_payroll_df,
     calculations_df <- calculations_df %>%
       dplyr::mutate(
         income_for_tax = dplyr::if_else(household_type == "married", starting_income / 2, starting_income),
-        !!tax_column   := if (!is.na(flat) && flat > 0) flat else calculate_program_tax(income_for_tax, rate, cap),
+        earner_share   = n_earning_adults / n_adults,
+        !!tax_column   := if (!is.na(flat) && flat > 0) {
+          dplyr::if_else(n_earning_adults == 0, 0, flat)
+        } else {
+          calculate_program_tax(income_for_tax, rate, cap) * earner_share
+        },
         state_payroll_tax = state_payroll_tax + !!rlang::sym(tax_column)
       )
   }
 
-  calculations_df <- calculations_df %>% dplyr::select(-income_for_tax)
+  calculations_df <- calculations_df %>% dplyr::select(-income_for_tax, -earner_share)
   return(calculations_df)
 }
 

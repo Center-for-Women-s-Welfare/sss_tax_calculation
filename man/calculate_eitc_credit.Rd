@@ -7,12 +7,20 @@
 calculate_eitc_credit(df)
 }
 \arguments{
-\item{df}{Dataframe with starting_income and EITC parameter columns}
+\item{df}{Dataframe with starting_income, n_earning_adults, and EITC parameter columns}
 }
 \value{
 Dataframe with eitc_credit column added
 }
 \description{
 Calculates Earned Income Tax Credit based on income and pre-joined EITC parameters.
-Assumes EITC lookup columns already exist in df.
+Assumes EITC lookup columns already exist in df. EITC requires earned income,
+so households with n_earning_adults == 0 (e.g. a fully SS/SSDI-supported
+senior household) get $0 regardless of income.
+}
+\details{
+Simplification: once n_earning_adults > 0, phase-in and phase-out both use
+total starting_income rather than earned income specifically (phase-in) or
+AGI (phase-out), since this package does not currently separate earned from
+unearned dollars within a mixed household's total income.
 }

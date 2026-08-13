@@ -3,7 +3,10 @@
 
 #' Validate Input Dataframe
 #'
-#' Checks that the input dataframe has all required columns and valid data
+#' Checks that the input dataframe has all required columns and valid data.
+#' `n_adults` and `n_earning_adults` are optional -- if absent, payroll tax
+#' and EITC calculations default n_earning_adults to n_adults (all adults
+#' earning), matching prior behavior exactly.
 #'
 #' @param df Input dataframe (calculations_df with basic needs)
 #' @return TRUE if valid, stops with error message if invalid

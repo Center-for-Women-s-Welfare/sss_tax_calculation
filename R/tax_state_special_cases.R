@@ -150,8 +150,12 @@ build_state_eitc_lookup <- function(eitc_lookup_df) {
 #' per-iteration fuzzyjoin that was the main solver bottleneck on large datasets.
 #'
 #' Must be called before [apply_CA_yctc()], which depends on `credit_ca_eitc`.
+#' Like the federal EITC, this is an earned-income credit -- gated to $0 when
+#' `n_earning_adults == 0` (default: `n_adults`, i.e. all adults earning, if
+#' the column is absent, matching prior behavior exactly).
 #'
-#' @param calculations_df Dataframe with starting_income and children
+#' @param calculations_df Dataframe with starting_income, children, household_type,
+#'   and (optionally) n_earning_adults
 #' @param state_eitc_lookup Pre-built lookup list from `build_state_eitc_lookup()`,
 #'   with elements `table` (long-format keyed by `bracket_idx` and
 #'   `ca_eitc_children`) and `breaks` (income_min vector for [findInterval()])
@@ -159,6 +163,10 @@ build_state_eitc_lookup <- function(eitc_lookup_df) {
 apply_CA_eitc <- function(calculations_df, state_eitc_lookup) {
   if (is.null(state_eitc_lookup$table)) {
     return(calculations_df %>% dplyr::mutate(credit_ca_eitc = 0))
+  }
+
+  if (!"n_earning_adults" %in% names(calculations_df)) {
+    calculations_df$n_earning_adults <- ifelse(calculations_df$household_type == "married", 2, 1)
   }
 
   calculations_df %>%
@@ -173,7 +181,8 @@ apply_CA_eitc <- function(calculations_df, state_eitc_lookup) {
     ) %>%
     dplyr::mutate(
       credit_ca_eitc = dplyr::if_else(starting_income > eitc_income_max, 0, credit_ca_eitc),
-      credit_ca_eitc = dplyr::coalesce(credit_ca_eitc, 0)
+      credit_ca_eitc = dplyr::coalesce(credit_ca_eitc, 0),
+      credit_ca_eitc = dplyr::if_else(n_earning_adults == 0, 0, credit_ca_eitc)
     ) %>%
     dplyr::select(-bracket_idx, -eitc_income_max)
 }
@@ -235,8 +244,12 @@ apply_CA_yctc <- function(calculations_df, tax_state_credits_df) {
 #' of income above that threshold, floored at `min_credit` through
 #' `phase_out_end`; above `phase_out_end` the credit is $0.
 #'
-#' @param calculations_df Dataframe with household_type, children, and
-#'   starting_income
+#' Like the federal EITC it's modeled on, this is an earned-income credit --
+#' gated to $0 when `n_earning_adults == 0` (default: `n_adults`, i.e. all
+#' adults earning, if the column is absent, matching prior behavior exactly).
+#'
+#' @param calculations_df Dataframe with household_type, children,
+#'   starting_income, and (optionally) n_earning_adults
 #' @param state_eitc_params State EITC-style credit parameters already
 #'   filtered to year/state, with filing_status, children, max_credit,
 #'   phase_out_start, phase_out_end, phase_out_rate, and min_credit columns
@@ -244,6 +257,10 @@ apply_CA_yctc <- function(calculations_df, tax_state_credits_df) {
 apply_state_eitc_style_credit <- function(calculations_df, state_eitc_params) {
   if (nrow(state_eitc_params) == 0L) {
     return(calculations_df %>% dplyr::mutate(credit_wftc = 0))
+  }
+
+  if (!"n_earning_adults" %in% names(calculations_df)) {
+    calculations_df$n_earning_adults <- ifelse(calculations_df$household_type == "married", 2, 1)
   }
 
   params <- state_eitc_params %>%
@@ -263,6 +280,7 @@ apply_state_eitc_style_credit <- function(calculations_df, state_eitc_params) {
     ) %>%
     dplyr::mutate(
       credit_wftc = dplyr::case_when(
+        n_earning_adults == 0               ~ 0,
         is.na(max_credit)                  ~ 0,
         starting_income <= phase_out_start  ~ max_credit,
         starting_income >  phase_out_end    ~ 0,

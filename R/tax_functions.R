@@ -130,9 +130,15 @@ load_fed_payroll_parameters <- function(tax_fed_payroll_df, year) {
 
 #' Calculate Federal Payroll Taxes
 #'
-#' Calculates Social Security and Medicare taxes
+#' Calculates Social Security and Medicare taxes. Income is split evenly
+#' across `n_adults`, but payroll tax is only charged on the
+#' `n_earning_adults` share of that split -- adults whose income is unearned
+#' (e.g. SS/SSDI, gap-filling retirement income) owe no payroll tax on it.
 #'
-#' @param calculations_df Dataframe with starting_income and household_type
+#' @param calculations_df Dataframe with starting_income, household_type, and
+#'   (optionally) n_earning_adults -- the number of adults whose income is
+#'   earned. If absent, defaults to n_adults (all adults earning), matching
+#'   prior behavior exactly.
 #' @param tax_fed_payroll_df Dataframe with federal payroll tax parameters
 #' @param year Tax year
 #' @return Dataframe with ss_tax, medicare_tax, and total_fed_payroll_tax columns added
@@ -140,11 +146,14 @@ calculate_federal_payroll_taxes <- function(calculations_df, tax_fed_payroll_df,
 
   params <- load_fed_payroll_parameters(tax_fed_payroll_df, year)
 
-  calculations_df$ss_income <- ifelse(
-    calculations_df$household_type == "married",
-    calculations_df$starting_income / 2,
-    calculations_df$starting_income
-  )
+  calculations_df$n_adults <- ifelse(calculations_df$household_type == "married", 2, 1)
+
+  if (!"n_earning_adults" %in% names(calculations_df)) {
+    calculations_df$n_earning_adults <- calculations_df$n_adults
+  }
+
+  calculations_df$income_per_adult <- calculations_df$starting_income / calculations_df$n_adults
+  calculations_df$ss_income        <- calculations_df$income_per_adult
 
   calculations_df$medicare_threshold <- ifelse(
     calculations_df$household_type == "married",
@@ -152,19 +161,16 @@ calculate_federal_payroll_taxes <- function(calculations_df, tax_fed_payroll_df,
     as.numeric(params$medicare_threshold_single_hh)
   )
 
-  calculations_df$ss_tax <- pmin(
-    calculations_df$ss_income,
-    as.numeric(params$ss_wage_limit)
-  ) * as.numeric(params$ss_rate)
+  per_adult_ss_tax <- pmin(calculations_df$income_per_adult, as.numeric(params$ss_wage_limit)) *
+    as.numeric(params$ss_rate)
 
-  calculations_df$medicare_tax <-
-    (pmin(calculations_df$ss_income, calculations_df$medicare_threshold) * as.numeric(params$medicare_rate)) +
-    (pmax(calculations_df$ss_income - calculations_df$medicare_threshold, 0) * as.numeric(params$medicare_additional_rate))
+  per_adult_medicare_tax <-
+    (pmin(calculations_df$income_per_adult, calculations_df$medicare_threshold) * as.numeric(params$medicare_rate)) +
+    (pmax(calculations_df$income_per_adult - calculations_df$medicare_threshold, 0) * as.numeric(params$medicare_additional_rate))
 
-  calculations_df$total_fed_payroll_tax <-
-    ifelse(calculations_df$household_type == "married",
-           (calculations_df$ss_tax + calculations_df$medicare_tax) * 2,
-           calculations_df$ss_tax + calculations_df$medicare_tax)
+  calculations_df$ss_tax       <- per_adult_ss_tax * calculations_df$n_earning_adults
+  calculations_df$medicare_tax <- per_adult_medicare_tax * calculations_df$n_earning_adults
+  calculations_df$total_fed_payroll_tax <- calculations_df$ss_tax + calculations_df$medicare_tax
 
   return(calculations_df)
 }
@@ -204,14 +210,22 @@ build_eitc_lookup <- function(eitc_params) {
 #' Calculate EITC Credit
 #'
 #' Calculates Earned Income Tax Credit based on income and pre-joined EITC parameters.
-#' Assumes EITC lookup columns already exist in df.
+#' Assumes EITC lookup columns already exist in df. EITC requires earned income,
+#' so households with n_earning_adults == 0 (e.g. a fully SS/SSDI-supported
+#' senior household) get $0 regardless of income.
 #'
-#' @param df Dataframe with starting_income and EITC parameter columns
+#' Simplification: once n_earning_adults > 0, phase-in and phase-out both use
+#' total starting_income rather than earned income specifically (phase-in) or
+#' AGI (phase-out), since this package does not currently separate earned from
+#' unearned dollars within a mixed household's total income.
+#'
+#' @param df Dataframe with starting_income, n_earning_adults, and EITC parameter columns
 #' @return Dataframe with eitc_credit column added
 calculate_eitc_credit <- function(df) {
   df %>%
     mutate(
       eitc_credit = case_when(
+        n_earning_adults == 0 ~ 0,
         starting_income <= eitc_income_at_max ~ starting_income * eitc_phase_in_rate,
         starting_income <= eitc_phase_out_start ~ eitc_max,
         starting_income <= eitc_phase_out_end ~ pmax(eitc_max - (eitc_phase_out_rate * (starting_income - eitc_phase_out_start)), 0),

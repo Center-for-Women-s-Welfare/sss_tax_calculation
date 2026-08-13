@@ -13,5 +13,8 @@ validate_input(df)
 TRUE if valid, stops with error message if invalid
 }
 \description{
-Checks that the input dataframe has all required columns and valid data
+Checks that the input dataframe has all required columns and valid data.
+\code{n_adults} and \code{n_earning_adults} are optional -- if absent, payroll tax
+and EITC calculations default n_earning_adults to n_adults (all adults
+earning), matching prior behavior exactly.
 }

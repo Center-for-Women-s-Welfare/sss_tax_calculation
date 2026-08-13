@@ -7,7 +7,8 @@
 apply_CA_eitc(calculations_df, state_eitc_lookup)
 }
 \arguments{
-\item{calculations_df}{Dataframe with starting_income and children}
+\item{calculations_df}{Dataframe with starting_income, children, household_type,
+and (optionally) n_earning_adults}
 
 \item{state_eitc_lookup}{Pre-built lookup list from \code{build_state_eitc_lookup()},
 with elements \code{table} (long-format keyed by \code{bracket_idx} and
@@ -24,4 +25,7 @@ per-iteration fuzzyjoin that was the main solver bottleneck on large datasets.
 }
 \details{
 Must be called before \code{\link[=apply_CA_yctc]{apply_CA_yctc()}}, which depends on \code{credit_ca_eitc}.
+Like the federal EITC, this is an earned-income credit -- gated to $0 when
+\code{n_earning_adults == 0} (default: \code{n_adults}, i.e. all adults earning, if
+the column is absent, matching prior behavior exactly).
 }
