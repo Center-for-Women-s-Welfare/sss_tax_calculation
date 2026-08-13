@@ -32,18 +32,18 @@ The Self-Sufficiency Standard measures the income families need to meet basic ne
 
 ```bash
 # Clone the repository
-git clone https://github.com/Center-for-Women-s-Welfare/sss_tax_calculation.git
-cd sss_tax_calculation
+git clone https://github.com/Center-for-Women-s-Welfare/sss_tax_calculation_sv.git
+cd sss_tax_calculation_sv
 
-R sss_tax_calculation   # depending on machine - open manually otherwise
+R sss_tax_calculation_sv   # depending on machine - open manually otherwise
 ```
 
 ```r
 # Within the R instance
 library(devtools)
 
-devtools::install_github("Center-for-Women-s-Welfare/sss_tax_calculation")
-library(sssTaxCalculation)   # update all packages!
+devtools::install_github("Center-for-Women-s-Welfare/sss_tax_calculation_sv")
+library(sssTaxCalculationSV)   # update all packages!
 ```
 
 ## Usage

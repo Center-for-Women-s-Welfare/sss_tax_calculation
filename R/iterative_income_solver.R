@@ -30,7 +30,7 @@ solve_starting_income_iterative <- function(df,
   }
 
   credit_params <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_credits.csv",
-                             package = "sssTaxCalculation"), show_col_types = FALSE) %>%
+                             package = "sssTaxCalculationSV"), show_col_types = FALSE) %>%
     dplyr::filter(sss_year == !!year)
 
   eitc_params  <- credit_params %>% dplyr::filter(credit == "eitc")
@@ -38,18 +38,18 @@ solve_starting_income_iterative <- function(df,
   ctc_params   <- credit_params %>% dplyr::filter(credit == "ctc")
 
   federal_standard_deduction <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_sd.csv",
-                              package = "sssTaxCalculation"), show_col_types = FALSE) %>%
+                              package = "sssTaxCalculationSV"), show_col_types = FALSE) %>%
     dplyr::filter(sss_year == !!year) %>%
     dplyr::select(-"sss_year") %>%
     tidyr::pivot_wider(names_from = filing_status, values_from = deduction)
 
   federal_tax_brackets <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_income_brackets.csv",
-                                       package = "sssTaxCalculation"), show_col_types = FALSE) %>%
+                                       package = "sssTaxCalculationSV"), show_col_types = FALSE) %>%
     dplyr::filter(sss_year == !!year) %>%
     dplyr::select(-"sss_year")
 
   federal_payroll <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_payroll.csv",
-                                       package = "sssTaxCalculation"), show_col_types = FALSE)
+                                       package = "sssTaxCalculationSV"), show_col_types = FALSE)
 
   eitc_lookup_df    <- build_eitc_lookup(eitc_params)
   cdctc_params_list <- extract_cdctc_params(cdctc_params)

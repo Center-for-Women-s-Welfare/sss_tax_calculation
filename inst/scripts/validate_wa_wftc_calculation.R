@@ -2,7 +2,7 @@
 # WA Working Families Tax Credit 2026 — Validation Script
 # 
 # Generates a dollar-by-dollar lookup table to validate the 
-# apply_state_eitc_style_credit() function in sssTaxCalculation.
+# apply_state_eitc_style_credit() function in sssTaxCalculationSV.
 # NOT used in production — parameters live in tax_state_eitc_params.csv
 #
 # Source: https://dor.wa.gov/about/news-releases/2026/working-families-tax-credit-application-window-opens-feb-1

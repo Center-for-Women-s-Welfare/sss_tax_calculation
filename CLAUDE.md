@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`sssTaxCalculation` is an R package that computes the minimum gross annual income ("starting income") a family needs to be self-sufficient, given a basic-needs cost dataframe. It solves a circular problem — income determines taxes/credits, which adjust net income, which changes credit eligibility — via an iterative numerical solver. Phase 1 (current) covers federal payroll taxes, federal income tax, EITC, CDCTC, and CTC across 719 family configurations. State tax support (the `state` parameter) is reserved for Phase 2 and is being built on the current branch (`feature/state-tax-integration-`).
+`sssTaxCalculationSV` is an R package that computes the minimum gross annual income ("starting income") a family needs to be self-sufficient, given a basic-needs cost dataframe. It is a fork of `sssTaxCalculation` (upstream: `Center-for-Women-s-Welfare/sss_tax_calculation`), diverging to add earned/unearned income support for the SV localized project — see `NOTES.md` for fork provenance. It solves a circular problem — income determines taxes/credits, which adjust net income, which changes credit eligibility — via an iterative numerical solver. Phase 1 (current) covers federal payroll taxes, federal income tax, EITC, CDCTC, and CTC across 719 family configurations. State tax support (the `state` parameter) is reserved for Phase 2 and is being built on the current branch (`feature/state-tax-integration-`).
 
 ## Commands
 
@@ -27,7 +27,7 @@ There is no separate lint/build step beyond standard `R CMD check` via `devtools
 The package has one exported entry point, `solve_starting_income_iterative()` in `R/iterative_income_solver.R`. It:
 
 1. Validates input via `validate_input()` (`R/validation.R`).
-2. Loads year-specific tax parameter CSVs from `inst/extdata/federal/{year}/` (and, for Phase 2, `inst/extdata/state/{year}/`) via `load_federal_tax_params()` (`R/data_loader.R`) — these are accessed at runtime through `system.file(..., package = "sssTaxCalculation")`, not relative paths, since this is an installed package.
+2. Loads year-specific tax parameter CSVs from `inst/extdata/federal/{year}/` (and, for Phase 2, `inst/extdata/state/{year}/`) via `load_federal_tax_params()` (`R/data_loader.R`) — these are accessed at runtime through `system.file(..., package = "sssTaxCalculationSV")`, not relative paths, since this is an installed package.
 3. Initializes `starting_income = subtotal3 * 1.20 * 12` and pre-joins per-row EITC lookup parameters (built once via `build_eitc_lookup()`).
 4. Loops up to `max_iterations` times: drops all previous-iteration calculation columns, recomputes payroll tax → income tax → brackets → EITC → CDCTC → CTC → `total_taxes`/`total_credits`, derives `new_starting_income = (subtotal3 * 12) + total_taxes - total_credits`, and checks `abs(new - previous) < tolerance` per row. Rows that converge stop updating their `iteration_count` (each row can converge independently and at a different iteration).
 5. Any rows still unconverged after `max_iterations` fall back to `subtotal3 * 1.20 * 12` and are flagged accordingly; a convergence summary is printed via `print_convergence_summary()` / `print_iteration_progress()` (`R/diagnostics.R`, gated by the `debug` flag).

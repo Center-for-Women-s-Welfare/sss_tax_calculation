@@ -1,4 +1,4 @@
 library(testthat)
-library(sssTaxCalculation)
+library(sssTaxCalculationSV)
 
-test_check("sssTaxCalculation")
+test_check("sssTaxCalculationSV")

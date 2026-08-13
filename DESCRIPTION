@@ -1,6 +1,6 @@
-Package: sssTaxCalculation
+Package: sssTaxCalculationSV
 Title: SSS Tax Calculation Engine
-Version: 0.1.0
+Version: 0.1.0.9000
 Authors@R: c(
     person("Alicia", "Chuang", email = "agchuang@uw.edu", role = c("aut", "cre")),
     person("Harshil", "Shah", email = "harshil6@uw.edu", role = "aut"),

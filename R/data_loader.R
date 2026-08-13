@@ -10,7 +10,7 @@
 load_federal_tax_params <- function(year) {
 
   fed_tax_dir <- system.file("extdata", "federal", as.character(year),
-                             package = "sssTaxCalculation")
+                             package = "sssTaxCalculationSV")
 
   if (!nzchar(fed_tax_dir)) {
     stop(paste(
@@ -39,7 +39,7 @@ load_federal_tax_params <- function(year) {
 load_state_tax_params <- function(year, state) {
 
   state_tax_dir <- system.file("extdata", "state", as.character(year),
-                               package = "sssTaxCalculation")
+                               package = "sssTaxCalculationSV")
 
   if (!nzchar(state_tax_dir)) {
     stop(paste(
