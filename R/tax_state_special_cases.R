@@ -21,36 +21,62 @@
 #'   otherwise unchanged
 apply_renters_deduction <- function(calculations_df, state_adjustments, calculation_vars) {
   if (!"renters_deduction" %in% calculation_vars) return(calculations_df)
-
+  
   renters_method <- state_adjustments %>%
     dplyr::filter(variable_name == "renters_deduction") %>%
     dplyr::pull(calculation_method) %>%
     unique()
-
-  if (renters_method == "renters_formula_pct") {
+  
+  # If multiple methods exist, use first. There should only be one method per variable_name.
+  renters_method <- dplyr::first(renters_method)
+  
+  if (renters_method == "renters_formula_cap") {
     renters_max <- state_adjustments %>%
-      dplyr::filter(variable_name == "renters_deduction") %>%
+      dplyr::filter(
+        variable_name == "renters_deduction",
+        calculation_method == "renters_formula_cap"
+      ) %>%
       dplyr::pull(value) %>%
       dplyr::first()
-
-    renters_rate <- state_adjustments %>%
+    
+    # Preferred new schema: renters_deduction + renters_formula_param
+    renters_rate_param <- state_adjustments %>%
+      dplyr::filter(
+        variable_name == "renters_rate",
+        calculation_method == "renters_formula_rate"
+      ) %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+    
+    # Legacy schema fallback: explicit renters_rate variable
+    renters_rate_legacy <- state_adjustments %>%
       dplyr::filter(variable_name == "renters_rate") %>%
       dplyr::pull(value) %>%
       dplyr::first()
-
+    
+    renters_rate <- dplyr::coalesce(renters_rate_param, renters_rate_legacy)
+    
+    # Preserve output contract: if rate missing, return unchanged df (no new column)
+    if (is.na(renters_rate)) return(calculations_df)
+    
     calculations_df <- calculations_df %>%
-      dplyr::mutate(renters_deduction = pmin(12 * housing_cost * renters_rate, renters_max))
-
+      dplyr::mutate(
+        renters_deduction = pmin(12 * housing_cost * renters_rate, renters_max)
+      )
+    
   } else if (renters_method == "renters_formula_min") {
     renters_max <- state_adjustments %>%
-      dplyr::filter(variable_name == "renters_deduction") %>%
+      dplyr::filter(
+        variable_name == "renters_deduction",
+        calculation_method == "renters_formula_min"
+      ) %>%
       dplyr::pull(value) %>%
       dplyr::first()
-
+    
     calculations_df <- calculations_df %>%
       dplyr::mutate(renters_deduction = pmin(12 * housing_cost, renters_max))
   }
-
+  
   calculations_df
 }
 
