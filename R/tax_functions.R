@@ -98,6 +98,8 @@ apply_calculation_method <- function(value_vector, method, calculations_df, var_
     v * calculations_df$eitc_credit
   } else if (method == "percent_of_fed_cdctc") {
     v * calculations_df$cdctc_credit
+  } else if (method == "percent_of_fed_cdctc_estimate") {
+    v * calculations_df$cdctc_estimate
   } else if (strict) {
     stop(glue::glue("Unknown calculation_method '{method}' for '{var_name}'."))
   } else {

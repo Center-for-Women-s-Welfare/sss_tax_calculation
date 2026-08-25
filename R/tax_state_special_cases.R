@@ -40,21 +40,13 @@ apply_renters_deduction <- function(calculations_df, state_adjustments, calculat
       dplyr::first()
     
     # Preferred new schema: renters_deduction + renters_formula_param
-    renters_rate_param <- state_adjustments %>%
+    renters_rate <- state_adjustments %>%
       dplyr::filter(
         variable_name == "renters_rate",
         calculation_method == "renters_formula_rate"
       ) %>%
       dplyr::pull(value) %>%
       dplyr::first()
-    
-    # Legacy schema fallback: explicit renters_rate variable
-    renters_rate_legacy <- state_adjustments %>%
-      dplyr::filter(variable_name == "renters_rate") %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
-    
-    renters_rate <- dplyr::coalesce(renters_rate_param, renters_rate_legacy)
     
     # Preserve output contract: if rate missing, return unchanged df (no new column)
     if (is.na(renters_rate)) return(calculations_df)
@@ -123,6 +115,123 @@ apply_commuter_deduction <- function(calculations_df, state_adjustments, calcula
   calculations_df
 }
 
+#' Apply Low- and Middle-Income Tax Exemption (State Special Case)
+#'
+#' Computes a state-specific (e.g., TN) low- and middle-income deduction when the
+#' state's TI-adjustment parameters define a `low_middle_income_exemption` variable using
+#' the `low_middle_income_formula` method: `if_else(taxable_income <= lmi_agi_limit,
+#' (adult + children) * (lmi_base_exemption - (lmi_phaseout_rate * pmax(taxable_income - lmi_base_income,0))),
+#' 0)`.
+#'
+#' Called by [calculate_state_taxable_income()] after the general adjustment loop.
+#'
+#' @param calculations_df Dataframe with public_transit_cost
+#' @param state_adjustments Dataframe of state TI-adjustment rows already
+#'   filtered to taxable_income_subtraction type
+#' @param calculation_vars Character vector of all variable_name values present
+#'   in state_adjustments
+#' @return Dataframe with a `low_middle_income_exemption` column added when applicable,
+#'   otherwise unchanged
+apply_low_middle_income_exemption <- function(calculations_df, state_adjustments, calculation_vars) {
+  if (!"low_middle_income_exemption" %in% calculation_vars) return(calculations_df)
+  
+  method <- state_adjustments %>%
+    dplyr::filter(variable_name == "low_middle_income_exemption") %>%
+    dplyr::pull(calculation_method) %>%
+    unique()
+  
+  if (method == "low_middle_income_formula") {
+    lmi_agi_limit <- state_adjustments %>%
+      dplyr::filter(variable_name == "lmi_agi_limit") %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+    
+    lmi_base_income <- state_adjustments %>%
+      dplyr::filter(variable_name == "lmi_base_income") %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+    
+    lmi_phaseout_rate <- state_adjustments %>%
+      dplyr::filter(variable_name == "lmi_phaseout_rate") %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+    
+    lmi_base_exemption <- state_adjustments %>%
+      dplyr::filter(variable_name == "lmi_base_exemption") %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+    
+    calculations_df <- calculations_df %>%
+      dplyr::mutate(
+        low_middle_income_exemption = if_else(taxable_income <= lmi_agi_limit,
+                                              (adult + children) * (lmi_base_exemption - 
+                                                (lmi_phaseout_rate * 
+                                                   pmax(taxable_income - lmi_base_income,0))),
+                                              0)
+      )
+  }
+  
+  calculations_df
+}
+
+#' Apply Property Tax Deduction (State Special Case)
+#'
+#' Computes a state-specific property tax deduction (e.g., NJ) when the
+#' state's TI-adjustment parameters define a `property_tax_deduction` variable using
+#' the `property_tax_formula` method. The NJ deduction is exclusive of a 
+#' property tax credit, so the formula includes a calculation of whether the
+#' deduction or credit is more advantageous. This same calculation is repeated
+#' in the tax credit calculation.
+#' 
+#' Called by [calculate_state_taxable_income()] after the general adjustment loop.
+#'
+#' @param calculations_df Dataframe with public_transit_cost
+#' @param state_adjustments Dataframe of state TI-adjustment rows already
+#'   filtered to taxable_income_subtraction type
+#' @param calculation_vars Character vector of all variable_name values present
+#'   in state_adjustments
+#' @return Dataframe with a `property_tax_deduction` column added when applicable,
+#'   otherwise unchanged
+apply_property_tax_deduction <- function(calculations_df, state_adjustments, calculation_vars) {
+  if (!"property_tax_deduction" %in% calculation_vars) return(calculations_df)
+  
+  method <- state_adjustments %>%
+    dplyr::filter(variable_name == "property_tax_deduction") %>%
+    dplyr::pull(calculation_method) %>%
+    unique()
+  
+  if (method == "property_tax_formula") {
+    property_tax_deduction_cap <- state_adjustments %>%
+      dplyr::filter(variable_name == "property_tax_deduction_cap") %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+    
+    property_tax_rate <- state_adjustments %>%
+      dplyr::filter(variable_name == "property_tax_rate") %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+    
+    property_tax_deduction_income_floor <- state_adjustments %>%
+      dplyr::filter(variable_name == "property_tax_deduction_income_floor") %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+
+    property_tax_deduction_choice <- state_adjustments %>%
+      dplyr::filter(variable_name == "property_tax_deduction_choice") %>%
+      dplyr::pull(value) %>%
+      dplyr::first()
+    
+    calculations_df <- calculations_df %>%
+      dplyr::mutate(
+        property_tax_deduction = if_else(,
+                                         pmin(property_tax_rate * housing_cost * 12, 
+                                      property_tax_deduction_cap),
+                                      0)
+      )
+  }
+  
+  calculations_df
+}
 
 # ---------- CREDIT SPECIAL CASES -----------------------------------
 
@@ -252,6 +361,33 @@ apply_CA_yctc <- function(calculations_df, tax_state_credits_df) {
     )
 }
 
+#' Apply State Child and Dependent Care Credit (State Special Case)
+#'
+#' Calculates Child and Dependent Care Credit based on childcare costs and income.
+#'
+#' @param df Dataframe with starting_income, children, child_care_cost, federal_cumulative_tax
+#' @param cdctc_params_list Named list of CDCTC parameters from extract_cdctc_params()
+#' @return Dataframe with CDCTC calculation columns added
+apply_state_cdcc <- function(df, cdctc_params_list) {
+  df$cdctc_max <- ifelse(
+    df$children == 1,
+    cdctc_params_list$max_credit_one_child,
+    ifelse(df$children >= 2, cdctc_params_list$max_credit_two_children, 0)
+  )
+  
+  df %>%
+    mutate(
+      cdctc_eligible_expense = pmin(child_care_cost * 12, cdctc_max),
+      cdctc_rate = case_when(
+        starting_income <= cdctc_params_list$lowest_bracket ~ cdctc_params_list$highest_rate,
+        starting_income >= cdctc_params_list$top_bracket_amount ~ cdctc_params_list$lowest_rate,
+        TRUE ~ round(cdctc_params_list$highest_rate - ((floor((starting_income - cdctc_params_list$lowest_bracket) / cdctc_params_list$bracket_interval)) * cdctc_params_list$rate_interval), 2)
+      ),
+      cdctc_estimate = cdctc_eligible_expense * cdctc_rate,
+      cdctc_credit = pmin(cdctc_estimate, federal_cumulative_tax)
+    )
+}
+
 #' Apply State EITC-Style Credit (e.g., WA Working Families Tax Credit)
 #'
 #' Computes a refundable, EITC-style credit for states (e.g., WA's Working
@@ -301,6 +437,52 @@ apply_state_eitc_style_credit <- function(calculations_df, state_eitc_params) {
     dplyr::select(-wftc_filing_status, -wftc_children, -max_credit,
                   -phase_out_start, -phase_out_end, -phase_out_rate, -min_credit)
 }
+
+#' Apply Special Property Tax Credit
+#'
+#' Computes a flat refundable property tax credit for a starting_income meeting
+#' the set eligibility minimum.
+#'
+#' @param calculations_df Dataframe with household_type and
+#'   starting_income
+#' @param tax_state_credits_df State credit parameters containing `property_tax_credit`
+#'   rows with `fixed` (credit value) methods
+#' @return Dataframe with `property_tax_credit` column added
+apply_property_tax_credit <- function(calculations_df, tax_state_credits_df) {
+  if (nrow(state_eitc_params) == 0L) {
+    return(calculations_df %>% dplyr::mutate(credit_wftc = 0))
+  }
+  
+  params <- state_eitc_params %>%
+    dplyr::mutate(children = pmin(children, 3L)) %>%
+    dplyr::select(filing_status, children, max_credit, phase_out_start,
+                  phase_out_end, phase_out_rate, min_credit)
+  
+  calculations_df %>%
+    dplyr::mutate(
+      wftc_filing_status = dplyr::if_else(household_type == "married", "married", "single"),
+      wftc_children      = pmin(children, 3L)
+    ) %>%
+    dplyr::left_join(
+      params,
+      by           = c("wftc_filing_status" = "filing_status", "wftc_children" = "children"),
+      relationship = "many-to-one"
+    ) %>%
+    dplyr::mutate(
+      credit_wftc = dplyr::case_when(
+        is.na(max_credit)                  ~ 0,
+        starting_income <= phase_out_start  ~ max_credit,
+        starting_income >  phase_out_end    ~ 0,
+        TRUE ~ pmax(
+          max_credit - phase_out_rate * (starting_income - phase_out_start),
+          min_credit
+        )
+      )
+    ) %>%
+    dplyr::select(-wftc_filing_status, -wftc_children, -max_credit,
+                  -phase_out_start, -phase_out_end, -phase_out_rate, -min_credit)
+}
+
 
 
 # ---------- CREDIT RESOLUTION HELPER --------------------------------

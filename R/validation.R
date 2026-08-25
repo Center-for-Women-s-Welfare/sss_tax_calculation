@@ -4,12 +4,17 @@
 #' Validate input dataframe and required derived columns
 #'
 #' @param df Input calculations dataframe
-#' @param year Tax year
+#' @param year Tax year (optional)
 #' @param state State abbreviation (optional)
 #' @param methods_present Character vector of calculation_method values found in
 #'   loaded tax parameter tables. If NULL, only base required columns are checked.
 #' @return Invisibly TRUE; errors if required columns are missing.
-validate_input <- function(df, year, state = NULL, methods_present = NULL) {
+validate_input <- function(df, year = NULL, state = NULL, methods_present = NULL) {
+  
+  if (!is.data.frame(df)) {
+    stop("Input must be a data frame, got: ", class(df))
+  }
+  
   # Always-required columns (existing behavior)
   required_cols <- c(
     # Subtotals
@@ -53,12 +58,11 @@ validate_input <- function(df, year, state = NULL, methods_present = NULL) {
     missing_base <- intersect(missing_cols, required_cols)
     missing_cond <- setdiff(missing_cols, required_cols)
     
-    msg <- c(
-      sprintf(
-        "Input dataframe is missing required column(s): %s",
-        paste(missing_cols, collapse = ", ")
-      )
-    )
+    msg <- c(paste(
+      "Missing required columns:",
+      paste(missing_cols, collapse = ", "),
+      "\nEnsure basic needs calculations have been completed."
+    ))
     
     if (length(missing_base) > 0) {
       msg <- c(msg, sprintf("Base required missing: %s", paste(missing_base, collapse = ", ")))
