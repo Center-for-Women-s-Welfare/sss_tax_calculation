@@ -22,7 +22,7 @@ solve_starting_income_iterative <- function(df,
                                             damping = 0.5,
                                             debug = FALSE) {
   
-  validate_input(df)
+  validate_input(df, year, state)
   
   if (!is.null(state)) {
     # Load all state-specific parameter tables once, outside the iteration loop.
