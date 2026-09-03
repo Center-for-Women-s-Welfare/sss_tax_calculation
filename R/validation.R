@@ -38,7 +38,9 @@ validate_input <- function(df, year = NULL, state = NULL, methods_present = NULL
     per_child_6plus         = c("children_6plus"),
     percent_of_fed_tax      = c("final_federal_income_tax"),
     percent_of_fed_eitc     = c("eitc_credit"),
-    percent_of_fed_cdctc    = c("cdctc_credit")
+    percent_of_fed_cdctc    = c("cdctc_credit"),
+    percent_of_fed_cdctc_estimate    = c("cdctc_estimate")
+    
   )
   
   methods_present <- unique(as.character(methods_present)[!is.na(methods_present)])

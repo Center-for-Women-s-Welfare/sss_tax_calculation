@@ -53,12 +53,19 @@ load_state_tax_params <- function(year, state) {
       filter(sss_year == !!year, state == !!state)
   }
 
+  ensure_num_children_column <- function(df) {
+    if (!"num_children" %in% names(df)) {
+      df <- df %>% mutate(num_children = NA_real_)
+    }
+    df
+  }
+  
   list(
     state_brackets          = readr::read_csv(file.path(state_tax_dir, "tax_state_income_brackets.csv"),  show_col_types = FALSE) %>% filter_to_year_state(),
-    state_credits           = readr::read_csv(file.path(state_tax_dir, "tax_state_credits.csv"),          show_col_types = FALSE) %>% filter_to_year_state(),
+    state_credits           = readr::read_csv(file.path(state_tax_dir, "tax_state_credits.csv"),          show_col_types = FALSE) %>% ensure_num_children_column() %>% filter_to_year_state(),
     state_payroll           = readr::read_csv(file.path(state_tax_dir, "tax_state_payroll.csv"),          show_col_types = FALSE) %>% filter_to_year_state(),
     state_ti_adjustments    = readr::read_csv(file.path(state_tax_dir, "tax_state_ti_adjustments.csv"),   show_col_types = FALSE) %>% filter_to_year_state(),
-    state_variable_brackets = readr::read_csv(file.path(state_tax_dir, "tax_state_variable_brackets.csv"), show_col_types = FALSE) %>% filter_to_year_state(),
+    state_variable_brackets = readr::read_csv(file.path(state_tax_dir, "tax_state_variable_brackets.csv"), show_col_types = FALSE) %>% ensure_num_children_column() %>% filter_to_year_state(),
     state_eitc_lookup       = readr::read_csv(file.path(state_tax_dir, "tax_state_eitc_lookup.csv"),      show_col_types = FALSE) %>% filter_to_year_state(),
     state_eitc_params       = readr::read_csv(file.path(state_tax_dir, "tax_state_eitc_params.csv"),      show_col_types = FALSE) %>% filter_to_year_state()
   )

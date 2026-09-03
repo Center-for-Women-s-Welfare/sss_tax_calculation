@@ -296,9 +296,12 @@ calculate_state_taxable_income <- function(calculations_df,
 # Tries exact filing_status first; falls back to "all" for unmatched rows.
 # This replaces the per-iteration fuzzyjoin in the generic credit loop.
 #
+# If number of children is provided, it will first try to match rows with the 
+# exact num_children value, then fall back to rows with num_children == NA.
+#
 # bracket_df must have columns: filing_status, income_min, income_max, value.
 # Returns a numeric vector length n with NA where no bracket matched.
-.bracket_lookup <- function(income, filing_status, bracket_df) {
+.bracket_lookup <- function(income, filing_status, bracket_df, children = NULL) {
   n      <- length(income)
   result <- rep(NA_real_, n)
   
@@ -310,40 +313,66 @@ calculate_state_taxable_income <- function(calculations_df,
       )
     )
   
-  specific <- bracket_df %>% dplyr::filter(filing_status != "all")
-  all_rows <- bracket_df %>% dplyr::filter(filing_status == "all")
+  if (!"num_children" %in% names(bracket_df)) {
+    bracket_df$num_children <- NA_real_
+  }
+  bracket_df <- bracket_df %>%
+    dplyr::mutate(num_children = suppressWarnings(as.numeric(num_children)))
   
-  for (fs in unique(specific$filing_status)) {
-    fs_brk     <- specific %>% dplyr::filter(filing_status == fs) %>% dplyr::arrange(income_min)
-    rows_in_fs <- which(filing_status == fs)
-    if (length(rows_in_fs) == 0L || nrow(fs_brk) == 0L) next
+  has_child_filter <- !is.null(children)
+  
+  lookup_subset <- function(idx_rows, rows_df) {
+    if (length(idx_rows) == 0L || nrow(rows_df) == 0L) return(invisible(NULL))
     
-    # findInterval gives O(log n) bracket lookup on sorted income_min.
-    idx         <- findInterval(income[rows_in_fs], fs_brk$income_min)
-    clipped_idx <- pmax(pmin(idx, nrow(fs_brk)), 1L)
-    in_range    <- idx >= 1L & idx <= nrow(fs_brk) &
-      income[rows_in_fs] <= fs_brk$income_max[clipped_idx]
+    rows_df <- rows_df %>% dplyr::arrange(income_min)
     
-    result[rows_in_fs[in_range]] <- as.numeric(fs_brk$value[clipped_idx[in_range]])
+    idx         <- findInterval(income[idx_rows], rows_df$income_min)
+    clipped_idx <- pmax(pmin(idx, nrow(rows_df)), 1L)
+    in_range    <- idx >= 1L & idx <= nrow(rows_df) &
+      income[idx_rows] <= rows_df$income_max[clipped_idx]
+    
+    hit_rows <- idx_rows[in_range]
+    hit_vals <- as.numeric(rows_df$value[clipped_idx[in_range]])
+    
+    can_fill <- is.na(result[hit_rows])
+    result[hit_rows[can_fill]] <<- hit_vals[can_fill]
   }
   
-  if (nrow(all_rows) > 0L) {
-    all_brk   <- all_rows %>% dplyr::arrange(income_min)
-    # Fallback for rows with no filing-status-specific bracket: use "all".
-    unmatched <- which(is.na(result))
-    if (length(unmatched) > 0L) {
-      idx         <- findInterval(income[unmatched], all_brk$income_min)
-      clipped_idx <- pmax(pmin(idx, nrow(all_brk)), 1L)
-      in_range    <- idx >= 1L & idx <= nrow(all_brk) &
-        income[unmatched] <= all_brk$income_max[clipped_idx]
+  fs_levels <- c(setdiff(unique(bracket_df$filing_status), "all"), "all")
+  
+  for (fs in fs_levels) {
+    fs_rows <- if (fs == "all") {
+      bracket_df %>% dplyr::filter(filing_status == "all")
+    } else {
+      bracket_df %>% dplyr::filter(filing_status == fs)
+    }
+    
+    idx_rows <- if (fs == "all") which(is.na(result)) else which(filing_status == fs)
+    if (length(idx_rows) == 0L || nrow(fs_rows) == 0L) next
+    
+    if (has_child_filter) {
+      child_vals <- children[idx_rows]
       
-      result[unmatched[in_range]] <- as.numeric(all_brk$value[clipped_idx[in_range]])
+      # exact child-specific rows
+      exact_child_rows <- fs_rows %>% dplyr::filter(!is.na(num_children))
+      for (cv in unique(child_vals)) {
+        cv_idx  <- idx_rows[child_vals == cv]
+        cv_rows <- exact_child_rows %>% dplyr::filter(num_children == cv)
+        lookup_subset(cv_idx, cv_rows)
+      }
+      
+      # fallback rows where num_children is NA
+      still_unmatched <- idx_rows[is.na(result[idx_rows])]
+      fallback_rows   <- fs_rows %>% dplyr::filter(is.na(num_children))
+      lookup_subset(still_unmatched, fallback_rows)
+    } else {
+      # old behavior
+      lookup_subset(idx_rows, fs_rows)
     }
   }
   
   result
 }
-
 
 # ---------- STATE TAX CREDITS ---------------------------------------
 
@@ -514,7 +543,8 @@ calculate_state_tax_credits <- function(calculations_df,
       matched_values <- .bracket_lookup(
         income        = calculations_df$starting_income,
         filing_status = calculations_df$state_filing_status,
-        bracket_df    = rows
+        bracket_df    = rows,
+        children      = calculations_df$children
       )
       
       credit_values <- apply_calculation_method(
