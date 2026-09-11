@@ -24,7 +24,9 @@ validate_input <- function(df, year = NULL, state = NULL, methods_present = NULL
     # Costs
     "child_care_cost", "health_ins_premium",
     # Geography
-    "county_table_number"
+    "county_table_number",
+    # Local income tax rate/fee/surtax
+    "tax_rate_local"
   )
   
   # Conditional requirements keyed by apply_calculation_method branches
