@@ -119,7 +119,7 @@ apply_calculation_method <- function(value_vector, method, calculations_df, var_
 #' @return Named list of payroll tax parameters
 load_fed_payroll_parameters <- function(tax_fed_payroll_df, year) {
   params_df <- tax_fed_payroll_df %>%
-    filter(year == !!year)
+    filter(sss_year == !!year)
 
   if (nrow(params_df) == 0) {
     stop(paste("No payroll parameters found for year", year))
