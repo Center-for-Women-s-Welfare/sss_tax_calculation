@@ -34,7 +34,14 @@ calculate_tax_from_brackets <- function(df, brackets_df,
       local_income_tax_rate = if (!is.null(local_income_tax_var)) .data[[local_income_tax_var]] else 0
     ) %>%
     left_join(brackets_df, by = "filing_status", relationship = "many-to-many") %>%
-    filter(taxable_income > lower_limit) %>%
+    # >= (not >): with `>`, taxable_income == 0 excludes every bracket (the
+    # first bracket's lower_limit is also 0), so the row has no bracket rows
+    # to sum and vanishes from this frame entirely -- the left_join below
+    # then leaves it NA instead of 0, silently zeroing out any downstream
+    # credit that depends on it. >= fixes this: for any bracket where
+    # taxable_income == lower_limit, taxable_at_bracket is 0 either way, so
+    # this only changes the degenerate all-excluded case, not any other value.
+    filter(taxable_income >= lower_limit) %>%
     mutate(
       taxable_at_bracket = pmin(taxable_income, upper_limit) - lower_limit,
       effective_rate = rate + local_income_tax_rate,
