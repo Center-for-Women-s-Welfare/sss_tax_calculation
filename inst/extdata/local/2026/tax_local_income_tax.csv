@@ -9,7 +9,6 @@ IN,county,universally,percent,county,"Indiana Department of Revenue. Departmenta
 IA,school_district,universally,surtax,county,"Iowa Department of Revenue. Iowa Counties, School District Numbers, Surtax Rates for 2025. Des Moines, IA. Accessed March 29, 2026. https://revenue.iowa.gov/media/4382/download?inline",4/1/2026,KSe,7/1/2026,KSe
 KY,municipality,selectively,percent,place,"Kentucky Secretary of State. “Occupational Taxes.” Commonwealth of Kentucky. Accessed June 17, 2026. https://web.sos.ky.gov/occupationaltax/.",4/9/2026,KSe,6/23/2026,KSe
 KY,county,universally,percent,county,"Kentucky Association of Counties. n.d. ""Data Brief: 2025 County Occupational Taxes."" https://www.kaco.org/articles/data-brief-2025-county-occupational-taxes/. Accessed April 9, 2026.",4/9/2026,KSe,6/23/2026,KSe
-MD,county,universally,percent,county,NA,4/10/2026,KSe,NA,NA
 MD,county,universally,bracket,county,NA,4/10/2026,KSe,NA,NA
 MI,municipality,selectively,percent,place,"Michigan Department of Treasury. “Which Cities Impose an Income Tax?” State of Michigan. Accessed July 1, 2026. https://www.michigan.gov/taxes/questions/iit/accordion/general/what-cities-impose-an-income-tax.",4/10/2026,KSe,7/1/2026,KSe
 MO,municipality,selectively,percent,place,"Tax-Rates.org. “Local Income Tax Rates in Missouri.” Accessed April 12, 2026. https://www.tax-rates.org/missouri/local-income-taxes.",4/12/2026,KSe,4/16/2026,KSe
