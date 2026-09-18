@@ -97,6 +97,32 @@ apply_commuter_deduction <- function(calculations_df, state_adjustments, calcula
   calculations_df
 }
 
+#' Exclude SS/SSDI Benefits from CA State Taxable Income (State Special Case)
+#'
+#' California does not tax Social Security or SSDI benefits at all --
+#' unlike the federal treatment (see [calculate_ss_benefit_taxability()]
+#' in tax_functions.R), this exclusion applies to the FULL benefit amount,
+#' not just the federally-non-taxable portion. No-op for every state other
+#' than CA, and for rows with no `annual_ss_ssdi_benefit` (defaults to 0).
+#'
+#' Called by [calculate_state_taxable_income()] after the general
+#' adjustment loop, alongside the other deduction special cases.
+#'
+#' @param calculations_df Dataframe with (optionally) annual_ss_ssdi_benefit
+#' @param state State postal code
+#' @return Dataframe with a `ca_ss_ssdi_exclusion` column added when
+#'   `state == "CA"`, otherwise unchanged
+apply_CA_ss_ssdi_exclusion <- function(calculations_df, state) {
+  if (state != "CA") return(calculations_df)
+
+  if (!"annual_ss_ssdi_benefit" %in% names(calculations_df)) {
+    calculations_df$annual_ss_ssdi_benefit <- 0
+  }
+
+  calculations_df %>%
+    dplyr::mutate(ca_ss_ssdi_exclusion = dplyr::coalesce(annual_ss_ssdi_benefit, 0))
+}
+
 
 # ---------- CREDIT SPECIAL CASES -----------------------------------
 

@@ -222,6 +222,7 @@ calculate_state_taxable_income <- function(calculations_df,
   # === Apply special-case formulas ===
   calculations_df <- apply_renters_deduction(calculations_df, state_adjustments, calculation_vars)
   calculations_df <- apply_commuter_deduction(calculations_df, state_adjustments, calculation_vars)
+  calculations_df <- apply_CA_ss_ssdi_exclusion(calculations_df, state)
 
   # === Compute state_cdctc_subtraction (e.g., ID) ===
   if ("cdctc_subtraction_max" %in% names(calculations_df)) {
@@ -241,6 +242,7 @@ calculate_state_taxable_income <- function(calculations_df,
   total_vars <- c(
     "standard_deduction", "personal_exemption", "dependent_exemption",
     "state_health_ins_deductible", "cdctc_subtraction_max", "state_cdctc_subtraction",
+    "ca_ss_ssdi_exclusion",
     setdiff(calculation_vars, c("standard_deduction", "personal_exemption",
                                 "dependent_exemption", "state_health_ins_deductible",
                                 "cdctc_subtraction_max"))
@@ -263,6 +265,7 @@ calculate_state_taxable_income <- function(calculations_df,
         dependent_exemption +
         dplyr::if_else(state_health_ins_deductible == 1, esi_premium_deduction, 0) +
         state_cdctc_subtraction +
+        ca_ss_ssdi_exclusion +
         rowSums(dplyr::across(dplyr::all_of(setdiff(calculation_vars, c(
           "standard_deduction", "personal_exemption", "dependent_exemption",
           "state_health_ins_deductible", "cdctc_subtraction_max"
