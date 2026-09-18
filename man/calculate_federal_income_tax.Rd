@@ -7,7 +7,8 @@
 calculate_federal_income_tax(df, federal_standard_deduction)
 }
 \arguments{
-\item{df}{Dataframe with starting_income, household_type, health_ins_premium}
+\item{df}{Dataframe with starting_income, household_type, health_ins_premium,
+and (optionally) annual_ss_ssdi_benefit -- see calculate_ss_benefit_taxability()}
 
 \item{federal_standard_deduction}{Dataframe with standard deductions by filing status}
 }

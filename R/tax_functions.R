@@ -337,12 +337,75 @@ calculate_ctc_credit <- function(df, ctc_params_list) {
 # FEDERAL INCOME TAX FUNCTIONS
 # ============================================================================
 
+#' Calculate Taxable Portion of SS/SSDI Benefits
+#'
+#' Implements the IRS Social Security Benefits Worksheet (Form 1040
+#' instructions) to determine what fraction of a household's SS/SSDI
+#' benefit is subject to federal income tax -- a marginal phase-in between
+#' two thresholds, not a step function.
+#'
+#' Provisional income = gap income (starting_income minus the benefit --
+#' this covers both wage income, if any, and any non-benefit "gap-filling"
+#' retirement income the household has) + tax-exempt interest (assumed $0,
+#' not modeled elsewhere in this package) + 50% of the SS/SSDI benefit.
+#' Thresholds: $25,000 / $34,000 (single_adult, single_parent) and
+#' $32,000 / $44,000 (married). Below the first threshold, 0% of the
+#' benefit is taxable; between the two thresholds, up to 50%; above the
+#' second, up to 85%.
+#'
+#' gap_income is floored at 0 -- if a household's benefit alone already
+#' exceeds their computed starting_income (possible for a low-cost county
+#' with a high combined benefit, e.g. two seniors), there's no real
+#' "other income" left to represent, and the worksheet has no provision
+#' for negative other income.
+#'
+#' Called from calculate_federal_income_tax() every solver iteration, so
+#' gap_income/provisional_income track that iteration's starting_income
+#' guess rather than a stale value from an earlier iteration -- gap income
+#' is circular with starting_income in exactly the way payroll tax and
+#' every other credit already is in this solver.
+#'
+#' @param df Dataframe with starting_income, household_type, and
+#'   (optionally) annual_ss_ssdi_benefit -- the household's fixed annual
+#'   SS/SSDI benefit amount. If absent, defaults to 0 (no benefit), so
+#'   every existing caller without this column is unaffected:
+#'   taxable_ss_benefit is always 0 and gap_income equals starting_income.
+#' @return Dataframe with gap_income, provisional_income, and
+#'   taxable_ss_benefit columns added
+calculate_ss_benefit_taxability <- function(df) {
+  if (!"annual_ss_ssdi_benefit" %in% names(df)) {
+    df$annual_ss_ssdi_benefit <- 0
+  }
+
+  df %>%
+    mutate(
+      annual_ss_ssdi_benefit = coalesce(annual_ss_ssdi_benefit, 0),
+      gap_income             = pmax(starting_income - annual_ss_ssdi_benefit, 0),
+      provisional_income     = gap_income + 0.5 * annual_ss_ssdi_benefit,
+
+      .base_amount        = ifelse(household_type == "married", 32000, 25000),
+      .second_threshold    = ifelse(household_type == "married", 12000, 9000),
+      .excess_over_base    = pmax(provisional_income - .base_amount, 0),
+      .excess_over_second  = pmax(.excess_over_base - .second_threshold, 0),
+      .smaller_base_second = pmin(.excess_over_base, .second_threshold),
+
+      taxable_ss_benefit = pmin(
+        pmin(0.5 * annual_ss_ssdi_benefit, 0.5 * .smaller_base_second) + 0.85 * .excess_over_second,
+        0.85 * annual_ss_ssdi_benefit
+      )
+    ) %>%
+    select(-starts_with("."))
+}
+
 #' Calculate Federal Income Tax Deductions and Taxable Income
 #'
-#' @param df Dataframe with starting_income, household_type, health_ins_premium
+#' @param df Dataframe with starting_income, household_type, health_ins_premium,
+#'   and (optionally) annual_ss_ssdi_benefit -- see calculate_ss_benefit_taxability()
 #' @param federal_standard_deduction Dataframe with standard deductions by filing status
 #' @return Dataframe with deduction and taxable income columns added
 calculate_federal_income_tax <- function(df, federal_standard_deduction) {
+  df <- calculate_ss_benefit_taxability(df)
+
   df %>%
     mutate(
       fed_sd = case_when(
@@ -352,7 +415,14 @@ calculate_federal_income_tax <- function(df, federal_standard_deduction) {
       ),
       esi_premium_deduction = health_ins_premium * 12,
       total_fed_deductions  = fed_sd + esi_premium_deduction,
-      taxable_income        = pmax(starting_income - total_fed_deductions, 0),
+      # Replace the full SS/SSDI benefit within starting_income with just its
+      # taxable portion -- the non-taxable share never enters the federal
+      # income tax base. Works uniformly for pure senior/disability
+      # households (starting_income = benefit + gap) and mixed households
+      # (starting_income = wages + benefit + gap), since only the benefit
+      # term itself gets the partial-exclusion treatment either way.
+      federal_taxable_income_base = starting_income - annual_ss_ssdi_benefit + taxable_ss_benefit,
+      taxable_income        = pmax(federal_taxable_income_base - total_fed_deductions, 0),
       filing_status         = household_type
     )
 }
