@@ -1,18 +1,84 @@
 # R/tax_state_special_cases.R
 # State-specific custom rules: special deduction formulas and credit helpers
 
+# ---------- HELPERS --------------------------------
+
+#' Validate grouped special-case parameter rows
+#'
+#' For a given `variable_name`, checks that required `calculation_method` rows
+#' exist and that their `value` entries are non-missing, returning named values
+#' when valid.
+#'
+#' @param rows_df Dataframe already filtered to one `variable_name`
+#' @param variable_name Character scalar; used in warning messages
+#' @param required_methods Character vector of required calculation_method names
+#' @param fn_name Character scalar; calling function name for warnings
+#' @return Named numeric vector of required method values, or `NULL` if invalid
+.get_required_method_values <- function(rows_df, variable_name, required_methods, fn_name) {
+  methods <- unique(stats::na.omit(rows_df$calculation_method))
+  missing_methods <- setdiff(required_methods, methods)
+  
+  if (length(missing_methods) > 0) {
+    warning(
+      sprintf(
+        "%s: variable_name '%s' is missing required calculation_method(s): %s. Returning unchanged calculations_df.",
+        fn_name, variable_name, paste(missing_methods, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+    return(NULL)
+  }
+  
+  vals <- stats::setNames(
+    lapply(required_methods, function(m) {
+      rows_df %>%
+        dplyr::filter(calculation_method == m) %>%
+        dplyr::pull(value) %>%
+        dplyr::first()
+    }),
+    required_methods
+  )
+  
+  vals_num <- as.numeric(vals)
+  names(vals_num) <- required_methods
+  
+  missing_vals <- names(vals_num)[is.na(vals_num)]
+  if (length(missing_vals) > 0) {
+    warning(
+      sprintf(
+        "%s: variable_name '%s' has NA value(s) for: %s. Returning unchanged calculations_df.",
+        fn_name, variable_name, paste(missing_vals, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+    return(NULL)
+  }
+  
+  vals_num
+}
+
 # ---------- DEDUCTION SPECIAL CASES --------------------------------
 
 #' Apply Renters Deduction (State Special Case)
 #'
-#' Computes a state-specific renters deduction when the state's TI-adjustment
-#' parameters define a `renters_deduction` variable. Supports two formulas:
-#' - `renters_formula_pct`: `min(12 * housing_cost * rate, max)` (used by IN, MA)
-#' - `renters_formula_min`: `min(12 * housing_cost, max)`
+#' Computes a state-specific renters deduction when taxable-income adjustment
+#' parameters include `variable_name == "renters_deduction"`.
+#'
+#' Supports grouped parameter rows distinguished by `calculation_method`:
+#' - If `renters_formula_min` is present, applies:
+#'   `pmin(12 * housing_cost, renters_max)`
+#' - If both `renters_formula_cap` and `renters_formula_rate` are present,
+#'   applies:
+#'   `pmin(12 * housing_cost * renters_rate, renters_max)`
+#'
+#' For grouped-method schemas, `renters_max` is taken from:
+#' - `renters_formula_min` (min formula), or
+#' - `renters_formula_cap` (cap+rate formula)
+#' and `renters_rate` is taken from `renters_formula_rate` for cap+rate.
 #'
 #' Called by [calculate_state_taxable_income()] after the general adjustment loop.
 #'
-#' @param calculations_df Dataframe with housing_cost
+#' @param calculations_df Dataframe with `housing_cost`
 #' @param state_adjustments Dataframe of state TI-adjustment rows already
 #'   filtered to taxable_income_subtraction type
 #' @param calculation_vars Character vector of all variable_name values present
@@ -22,65 +88,66 @@
 apply_renters_deduction <- function(calculations_df, state_adjustments, calculation_vars) {
   if (!"renters_deduction" %in% calculation_vars) return(calculations_df)
   
-  renters_method <- state_adjustments %>%
-    dplyr::filter(variable_name == "renters_deduction") %>%
-    dplyr::pull(calculation_method) %>%
-    unique()
+  renters_rows <- state_adjustments %>%
+    dplyr::filter(variable_name == "renters_deduction")
   
-  # If multiple methods exist, use first. There should only be one method per variable_name.
-  renters_method <- dplyr::first(renters_method)
+  renters_methods <- unique(stats::na.omit(renters_rows$calculation_method))
   
-  if (renters_method == "renters_formula_cap") {
-    renters_max <- state_adjustments %>%
-      dplyr::filter(
-        variable_name == "renters_deduction",
-        calculation_method == "renters_formula_cap"
-      ) %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
+  # Priority: if explicit min formula exists, use it.
+  if ("renters_formula_min" %in% renters_methods) {
+    vals <- .get_required_method_values(
+      rows_df = renters_rows,
+      variable_name = "renters_deduction",
+      required_methods = c("renters_formula_min"),
+      fn_name = "apply_renters_deduction"
+    )
+    if (is.null(vals)) return(calculations_df)
     
-    # Preferred new schema: renters_deduction + renters_formula_param
-    renters_rate <- state_adjustments %>%
-      dplyr::filter(
-        variable_name == "renters_rate",
-        calculation_method == "renters_formula_rate"
-      ) %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
+    renters_max <- vals[["renters_formula_min"]]
     
-    # Preserve output contract: if rate missing, return unchanged df (no new column)
-    if (is.na(renters_rate)) return(calculations_df)
-    
-    calculations_df <- calculations_df %>%
-      dplyr::mutate(
-        renters_deduction = pmin(12 * housing_cost * renters_rate, renters_max)
-      )
-    
-  } else if (renters_method == "renters_formula_min") {
-    renters_max <- state_adjustments %>%
-      dplyr::filter(
-        variable_name == "renters_deduction",
-        calculation_method == "renters_formula_min"
-      ) %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
-    
-    calculations_df <- calculations_df %>%
-      dplyr::mutate(renters_deduction = pmin(12 * housing_cost, renters_max))
+    return(
+      calculations_df %>%
+        dplyr::mutate(
+          renters_deduction = pmin(12 * housing_cost, renters_max)
+        )
+    )
   }
   
-  calculations_df
+  # Otherwise require cap + rate formula.
+  vals <- .get_required_method_values(
+    rows_df = renters_rows,
+    variable_name = "renters_deduction",
+    required_methods = c("renters_formula_cap", "renters_formula_rate"),
+    fn_name = "apply_renters_deduction"
+  )
+  if (is.null(vals)) return(calculations_df)
+  
+  renters_max  <- vals[["renters_formula_cap"]]
+  renters_rate <- vals[["renters_formula_rate"]]
+  
+  calculations_df %>%
+    dplyr::mutate(
+      renters_deduction = pmin(12 * housing_cost * renters_rate, renters_max)
+    )
 }
 
 #' Apply Commuter Deduction (State Special Case)
 #'
-#' Computes a state-specific commuter expense deduction (e.g., MA) when the
-#' state's TI-adjustment parameters define a `commuter_deduction` variable using
-#' the `commuter_formula` method: `min(max(public_transit_cost - threshold, 0), max)`.
+#' Computes a state-specific commuter expense deduction when taxable-income
+#' adjustment parameters include `variable_name == "commuter_deduction"`.
 #'
-#' Called by [calculate_state_taxable_income()] after the general adjustment loop.
+#' Parameters are grouped under `commuter_deduction` and distinguished by
+#' `calculation_method`. This rule requires:
+#' - `commuter_max`
+#' - `commuter_exclusion`
 #'
-#' @param calculations_df Dataframe with public_transit_cost
+#' Formula:
+#' `pmin(pmax(public_transit_cost - commuter_exclusion, 0), commuter_max)`
+#'
+#' Called by [calculate_state_taxable_income()] after the general adjustment
+#' loop.
+#'
+#' @param calculations_df Dataframe with `public_transit_cost`
 #' @param state_adjustments Dataframe of state TI-adjustment rows already
 #'   filtered to taxable_income_subtraction type
 #' @param calculation_vars Character vector of all variable_name values present
@@ -89,30 +156,28 @@ apply_renters_deduction <- function(calculations_df, state_adjustments, calculat
 #'   otherwise unchanged
 apply_commuter_deduction <- function(calculations_df, state_adjustments, calculation_vars) {
   if (!"commuter_deduction" %in% calculation_vars) return(calculations_df)
-
-  commuter_method <- state_adjustments %>%
-    dplyr::filter(variable_name == "commuter_deduction") %>%
-    dplyr::pull(calculation_method) %>%
-    unique()
-
-  if (commuter_method == "commuter_formula") {
-    commuter_max <- state_adjustments %>%
-      dplyr::filter(variable_name == "commuter_deduction") %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
-
-    commuter_threshold <- state_adjustments %>%
-      dplyr::filter(variable_name == "commuter_threshold") %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
-
-    calculations_df <- calculations_df %>%
-      dplyr::mutate(
-        commuter_deduction = pmin(pmax(public_transit_cost - commuter_threshold, 0), commuter_max)
+  
+  commuter_rows <- state_adjustments %>%
+    dplyr::filter(variable_name == "commuter_deduction")
+  
+  vals <- .get_required_method_values(
+    rows_df = commuter_rows,
+    variable_name = "commuter_deduction",
+    required_methods = c("commuter_max", "commuter_exclusion"),
+    fn_name = "apply_commuter_deduction"
+  )
+  if (is.null(vals)) return(calculations_df)
+  
+  commuter_max <- vals[["commuter_max"]]
+  commuter_exclusion <- vals[["commuter_exclusion"]]
+  
+  calculations_df %>%
+    dplyr::mutate(
+      commuter_deduction = pmin(
+        pmax(public_transit_cost - commuter_exclusion, 0),
+        commuter_max
       )
-  }
-
-  calculations_df
+    )
 }
 
 #' Apply Low- and Middle-Income Tax Exemption (State Special Case)
@@ -176,16 +241,25 @@ apply_low_middle_income_exemption <- function(calculations_df, state_adjustments
 
 #' Apply Property Tax Deduction (State Special Case)
 #'
-#' Computes a state-specific property tax deduction (e.g., NJ) when the
-#' state's TI-adjustment parameters define a `property_tax_deduction` variable using
-#' the `property_tax_formula` method. The NJ deduction is exclusive of a 
-#' property tax credit, so the formula includes a calculation of whether the
-#' deduction or credit is more advantageous. This same calculation is repeated
-#' in the tax credit calculation.
-#' 
+#' Computes a state-specific property tax deduction when taxable-income
+#' adjustment parameters include `variable_name == "property_tax_deduction"`.
+#'
+#' Parameters are grouped under `property_tax_deduction` and distinguished by
+#' `calculation_method`. This rule requires all of:
+#' - `property_tax_deduction_income_floor`
+#' - `property_tax_rate`
+#' - `property_tax_deduction_cap`
+#' - `property_tax_deduction_choice`
+#'
+#' Formula:
+#' - If `taxable_income >= property_tax_deduction_income_floor` and
+#'   `property_tax_deduction_choice == 1`, then
+#'   `pmin(property_tax_rate * housing_cost * 12, property_tax_deduction_cap)`
+#' - Otherwise `0`
+#'
 #' Called by [calculate_state_taxable_income()] after the general adjustment loop.
 #'
-#' @param calculations_df Dataframe with public_transit_cost
+#' @param calculations_df Dataframe with `taxable_income` and `housing_cost`
 #' @param state_adjustments Dataframe of state TI-adjustment rows already
 #'   filtered to taxable_income_subtraction type
 #' @param calculation_vars Character vector of all variable_name values present
@@ -195,42 +269,36 @@ apply_low_middle_income_exemption <- function(calculations_df, state_adjustments
 apply_property_tax_deduction <- function(calculations_df, state_adjustments, calculation_vars) {
   if (!"property_tax_deduction" %in% calculation_vars) return(calculations_df)
   
-  method <- state_adjustments %>%
-    dplyr::filter(variable_name == "property_tax_deduction") %>%
-    dplyr::pull(calculation_method) %>%
-    unique()
+  prop_rows <- state_adjustments %>%
+    dplyr::filter(variable_name == "property_tax_deduction")
   
-  if (method == "property_tax_formula") {
-    property_tax_deduction_cap <- state_adjustments %>%
-      dplyr::filter(variable_name == "property_tax_deduction_cap") %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
-    
-    property_tax_rate <- state_adjustments %>%
-      dplyr::filter(variable_name == "property_tax_rate") %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
-    
-    property_tax_deduction_income_floor <- state_adjustments %>%
-      dplyr::filter(variable_name == "property_tax_deduction_income_floor") %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
-
-    property_tax_deduction_choice <- state_adjustments %>%
-      dplyr::filter(variable_name == "property_tax_deduction_choice") %>%
-      dplyr::pull(value) %>%
-      dplyr::first()
-    
-    calculations_df <- calculations_df %>%
-      dplyr::mutate(
-        property_tax_deduction = if_else(,
-                                         pmin(property_tax_rate * housing_cost * 12, 
-                                      property_tax_deduction_cap),
-                                      0)
+  vals <- .get_required_method_values(
+    rows_df = prop_rows,
+    variable_name = "property_tax_deduction",
+    required_methods = c(
+      "property_tax_deduction_income_floor",
+      "property_tax_rate",
+      "property_tax_deduction_cap",
+      "property_tax_deduction_choice"
+    ),
+    fn_name = "apply_property_tax_deduction"
+  )
+  if (is.null(vals)) return(calculations_df)
+  
+  property_tax_deduction_income_floor <- vals[["property_tax_deduction_income_floor"]]
+  property_tax_rate                   <- vals[["property_tax_rate"]]
+  property_tax_deduction_cap          <- vals[["property_tax_deduction_cap"]]
+  property_tax_deduction_choice       <- vals[["property_tax_deduction_choice"]]
+  
+  calculations_df %>%
+    dplyr::mutate(
+      property_tax_deduction = dplyr::if_else(
+        taxable_income >= property_tax_deduction_income_floor &
+          property_tax_deduction_choice == 1,
+        pmin(property_tax_rate * housing_cost * 12, property_tax_deduction_cap),
+        0
       )
-  }
-  
-  calculations_df
+    )
 }
 
 # ---------- CREDIT SPECIAL CASES -----------------------------------
@@ -491,159 +559,6 @@ apply_NY_pre2026_cdctc <- function(calculations_df, cdcc_rows, bracket_lookup_ch
   credit <- fed_estimate * dplyr::coalesce(ny_coef, 0)
   
   dplyr::coalesce(credit, 0)
-}
-
-#' Calculate State Child and Dependent Care Tax Credit (CDCTC)
-#'
-#' Computes state child and dependent care credits from `tax_state_credits_df`
-#' rows for `variable_name == "child_dependent_care"`, using one or more
-#' `calculation_method` values. This function handles the common generic
-#' pathways (e.g., percentage of federal CDCTC) and delegates legacy NY
-#' pre-2026 logic to [apply_NY_pre2026_cdctc()].
-#'
-#' Supported methods in this function:
-#' - `percent_of_fed_cdctc`: Apply a matched percentage to `cdctc_credit`
-#' - `percent_of_fed_cdctc_estimate`: Compute a federal-style estimate from
-#'   income-rate brackets and capped expenses, then use that estimate as the
-#'   state credit basis
-#'
-#' If `ny_pre2026_federal_brackets` is present, this function calls
-#' [apply_NY_pre2026_cdctc()] and uses that result.
-#'
-#' Assumptions:
-#' - State AGI proxy is `starting_income`
-#' - Federal CDCTC amount is already present in `cdctc_credit`
-#' - `tax_state_credits_df` is pre-filtered to one year/state
-#'
-#' @param calculations_df Dataframe with `starting_income`, `household_type`,
-#'   `state_filing_status` (optional), `children`, `child_care_cost`,
-#'   and `cdctc_credit`
-#' @param tax_state_credits_df State credit parameters already filtered to
-#'   year/state
-#' @return Dataframe with `state_cdctc_credit` column added
-calculate_state_cdctc_credit <- function(calculations_df, tax_state_credits_df) {
-  if (!"state_filing_status" %in% names(calculations_df)) {
-    calculations_df <- calculations_df %>%
-      dplyr::mutate(state_filing_status = household_type)
-  }
-  
-  # Guard rails
-  if (!"children" %in% names(calculations_df)) calculations_df$children <- 0
-  if (!"child_care_cost" %in% names(calculations_df)) calculations_df$child_care_cost <- 0
-  if (!"cdctc_credit" %in% names(calculations_df)) calculations_df$cdctc_credit <- 0
-  
-  cdcc_rows <- tax_state_credits_df %>%
-    dplyr::filter(variable_name == "child_dependent_care") %>%
-    dplyr::mutate(
-      calculation_method = trimws(calculation_method),
-      filing_status      = trimws(filing_status)
-    )
-  
-  if (!"num_children" %in% names(cdcc_rows)) {
-    cdcc_rows <- cdcc_rows %>% dplyr::mutate(num_children = NA_real_)
-  }
-  
-  if (nrow(cdcc_rows) == 0) {
-    calculations_df$state_cdctc_credit <- 0
-    return(calculations_df)
-  }
-  
-  methods <- unique(stats::na.omit(cdcc_rows$calculation_method))
-  
-  # helper: bracket lookup with optional exact num_children match + NA fallback
-  bracket_lookup_children <- function(income, filing_status, bracket_df, children = NULL) {
-    n <- length(income)
-    out <- rep(NA_real_, n)
-    
-    if (!"num_children" %in% names(bracket_df)) bracket_df$num_children <- NA_real_
-    bracket_df <- bracket_df %>%
-      dplyr::mutate(
-        filing_status = dplyr::if_else(is.na(filing_status) | filing_status == "", "all", filing_status),
-        num_children  = suppressWarnings(as.numeric(num_children))
-      )
-    
-    fs_levels <- c(setdiff(unique(bracket_df$filing_status), "all"), "all")
-    
-    for (fs in fs_levels) {
-      fs_df <- if (fs == "all") bracket_df %>% dplyr::filter(filing_status == "all") else bracket_df %>% dplyr::filter(filing_status == fs)
-      if (nrow(fs_df) == 0) next
-      
-      idx_rows <- if (fs == "all") which(is.na(out)) else which(filing_status == fs)
-      if (length(idx_rows) == 0) next
-      
-      assign_from <- function(row_idx, tbl) {
-        if (length(row_idx) == 0 || nrow(tbl) == 0) return(invisible(NULL))
-        tbl <- tbl %>% dplyr::arrange(income_min)
-        idx <- findInterval(income[row_idx], tbl$income_min)
-        good <- idx >= 1 & idx <= nrow(tbl)
-        pick <- pmax(pmin(idx, nrow(tbl)), 1L)
-        in_range <- good & income[row_idx] <= tbl$income_max[pick]
-        hit_rows <- row_idx[in_range]
-        hit_vals <- as.numeric(tbl$value[pick[in_range]])
-        can_fill <- is.na(out[hit_rows])
-        out[hit_rows[can_fill]] <<- hit_vals[can_fill]
-      }
-      
-      if (!is.null(children)) {
-        exact_df <- fs_df %>% dplyr::filter(!is.na(num_children))
-        for (cv in unique(children[idx_rows])) {
-          cv_idx <- idx_rows[children[idx_rows] == cv]
-          cv_df  <- exact_df %>% dplyr::filter(num_children == cv)
-          assign_from(cv_idx, cv_df)
-        }
-        fallback_idx <- idx_rows[is.na(out[idx_rows])]
-        fallback_df  <- fs_df %>% dplyr::filter(is.na(num_children))
-        assign_from(fallback_idx, fallback_df)
-      } else {
-        assign_from(idx_rows, fs_df)
-      }
-    }
-    
-    out
-  }
-  
-  credit <- rep(0, nrow(calculations_df))
-  
-  # Common method: percent of federal CDCTC
-  if ("percent_of_fed_cdctc" %in% methods) {
-    rows <- cdcc_rows %>% dplyr::filter(calculation_method == "percent_of_fed_cdctc")
-    pct <- bracket_lookup_children(
-      income        = calculations_df$starting_income,
-      filing_status = calculations_df$state_filing_status,
-      bracket_df    = rows,
-      children      = calculations_df$children
-    )
-    credit <- dplyr::coalesce(pct, 0) * dplyr::coalesce(calculations_df$cdctc_credit, 0)
-  }
-  
-  # Common method: percent of federal CDCTC estimate
-  if ("percent_of_fed_cdctc_estimate" %in% methods) {
-    rows <- cdcc_rows %>% dplyr::filter(calculation_method == "percent_of_fed_cdctc_estimate")
-    fed_rate <- bracket_lookup_children(
-      income        = calculations_df$starting_income,
-      filing_status = calculations_df$state_filing_status,
-      bracket_df    = rows,
-      children      = calculations_df$children
-    )
-    
-    fed_expense_cap <- dplyr::if_else(calculations_df$children <= 1, 3000, 6000)
-    fed_eligible_expense <- pmin(dplyr::coalesce(calculations_df$child_care_cost, 0) * 12, fed_expense_cap)
-    fed_estimate <- fed_eligible_expense * dplyr::coalesce(fed_rate, 0)
-    
-    credit <- fed_estimate
-  }
-  
-  # Legacy NY path delegated to dedicated helper
-  if ("ny_pre2026_federal_brackets" %in% methods) {
-    credit <- apply_NY_pre2026_cdctc(
-      calculations_df = calculations_df,
-      cdcc_rows = cdcc_rows,
-      bracket_lookup_children = bracket_lookup_children
-    )
-  }
-  
-  calculations_df$state_cdctc_credit <- dplyr::coalesce(credit, 0)
-  calculations_df
 }
 
 #' Calculate State Child and Dependent Care Tax Credit (CDCTC)

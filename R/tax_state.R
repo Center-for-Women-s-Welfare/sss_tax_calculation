@@ -156,12 +156,10 @@ calculate_state_taxable_income <- function(calculations_df,
   
   calculation_vars <- unique(state_adjustments$variable_name)
   
-  special_cases <- c("renters_deduction", "commuter_deduction", "commuter_threshold",
-                     "renters_rate","low_middle_income_exemption","lmi_agi_limit",
+  special_cases <- c("renters_deduction", "commuter_deduction", 
+                     "low_middle_income_exemption","lmi_agi_limit",
                      "lmi_base_income","lmi_phaseout_rate","lmi_base_exemption",
-                     "property_tax_deduction","property_tax_deduction_income_floor",
-                     "property_tax_rate", "property_tax_deduction_cap", 
-                     "property_tax_deduction_choice")
+                     "property_tax_deduction")
   general_vars  <- setdiff(calculation_vars, special_cases)
   
   for (var in general_vars) {
@@ -220,6 +218,7 @@ calculate_state_taxable_income <- function(calculations_df,
   calculations_df <- apply_renters_deduction(calculations_df, state_adjustments, calculation_vars)
   calculations_df <- apply_commuter_deduction(calculations_df, state_adjustments, calculation_vars)
   calculations_df <- apply_low_middle_income_exemption(calculations_df, state_adjustments, calculation_vars)
+  calculations_df <- apply_property_tax_deduction(calculations_df, state_adjustments, calculation_vars)
   
   # === Compute state_cdctc_subtraction (e.g., ID) ===
   if ("cdctc_subtraction_max" %in% names(calculations_df)) {
@@ -487,7 +486,8 @@ calculate_state_tax_credits <- function(calculations_df,
   # Special-case credit formulas
   # These handlers add state-specific credits not representable in the generic
   # loop via a single method/value mapping.
-  if ("special_ca_eitc" %in% state_credits$calculation_method) {
+
+    if ("special_ca_eitc" %in% state_credits$calculation_method) {
     calculations_df <- apply_CA_eitc(
       calculations_df  = calculations_df,
       state_eitc_lookup = state_eitc_lookup

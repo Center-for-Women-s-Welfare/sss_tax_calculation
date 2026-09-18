@@ -97,7 +97,7 @@ solve_starting_income_iterative <- function(df,
         "federal_total_refundable_credits", "federal_tax_liability_with_refund", "final_federal_income_tax",
         "state_nonrefundable_credit_applied", "state_tax_after_nonrefundable",
         "state_tax_liability_with_refund", "final_state_income_tax",
-        "federal_net", "state_net",
+        "federal_net", "state_net","local_income_tax",
         "total_taxes", "total_credits", "new_starting_income", "income_diff", "row_converged",
         "state_payroll_tax", "total_state_deductions", "state_taxable_income", "state_cumulative_tax"
       ))) %>%
@@ -144,6 +144,22 @@ solve_starting_income_iterative <- function(df,
       df$state_refundable_credits        <- 0
     }
     
+    # Local income tax (Phase 2)
+    # tax_rate_local is required by validate_input() and defaults to 0 upstream.
+    if (!is.null(state)) {
+      df <- calculate_local_income_tax(
+        df = df,
+        tax_type = state_params$local_tax_type,                # scalar for this run/state
+        brackets_df = state_params$local_income_tax_brackets,  # NULL unless bracket type
+        income_col = "starting_income",
+        rate_col = "tax_rate_local",
+        state_tax_col = "state_tax_after_nonrefundable",
+        out_col = "local_income_tax"
+      )
+    } else {
+      df$local_income_tax <- 0
+    }
+    
     df <- df %>%
       dplyr::mutate(
         federal_net = coalesce(federal_tax_liability_with_refund, 0),
@@ -156,6 +172,7 @@ solve_starting_income_iterative <- function(df,
         # Taxes count only positive net liabilities; credits are tracked separately.
         total_taxes   = coalesce(total_fed_payroll_tax, 0) +
           coalesce(state_payroll_tax, 0) +
+          coalesce(local_income_tax, 0) +
           pmax(federal_net, 0) +
           pmax(state_net, 0),
         total_credits = pmax(-federal_net, 0) +
