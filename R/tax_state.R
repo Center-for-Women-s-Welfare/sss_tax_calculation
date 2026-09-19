@@ -156,11 +156,32 @@ calculate_state_taxable_income <- function(calculations_df,
   
   calculation_vars <- unique(state_adjustments$variable_name)
   
-  special_cases <- c("renters_deduction", "commuter_deduction", 
-                     "low_middle_income_exemption","lmi_agi_limit",
-                     "lmi_base_income","lmi_phaseout_rate","lmi_base_exemption",
-                     "property_tax_deduction")
-  general_vars  <- setdiff(calculation_vars, special_cases)
+  # Instead of a fixed variable-name whitelist, detect "special-case" TI adjustment
+  # variables by whether they have more than one distinct calculation_method for the
+  # same variable_name (e.g. renters_deduction: renters_formula_cap + renters_formula_rate,
+  # or renters_formula_min alone still counts as 1 — see note below), OR whether they are
+  # known auxiliary parameter rows consumed by a dedicated handler rather than applied
+  # directly as a deduction.
+  
+  method_counts <- state_adjustments %>%
+    dplyr::group_by(variable_name) %>%
+    dplyr::summarise(n_methods = dplyr::n_distinct(calculation_method), .groups = "drop")
+  
+  multi_method_vars <- method_counts %>%
+    dplyr::filter(n_methods > 1) %>%
+    dplyr::pull(variable_name)
+  
+  # Auxiliary/parameter-only variables that a dedicated handler reads directly
+  # (they should never be added as an ordinary deduction column via the generic loop).
+  auxiliary_param_vars <- c(
+    "low_middle_income_exemption",
+    "lmi_agi_limit", "lmi_base_income", "lmi_phaseout_rate", "lmi_base_exemption",
+    "property_tax_deduction",
+    "property_tax_deduction_income_floor", "property_tax_rate",
+    "property_tax_deduction_cap", "property_tax_deduction_choice"
+  )
+  
+  special_cases <- union(multi_method_vars, auxiliary_param_vars)  general_vars  <- setdiff(calculation_vars, special_cases)
   
   for (var in general_vars) {
     rows   <- state_adjustments %>% dplyr::filter(variable_name == var)
@@ -387,15 +408,44 @@ calculate_state_tax_credits <- function(calculations_df,
       variable_name      = trimws(variable_name)
     )
   
-  # Parameter rows used only by special-case handlers; skip in generic loop
-  special_param_vars <- c("early_childhood_pct", "early_childhood_max")
+  # Detect "special" credit variables the same way we now detect special TI-adjustment
+  # variables: by counting distinct calculation_method values per variable_name, rather
+  # than relying on a "^special_" naming convention in calculation_method. A variable_name
+  # with more than one method (e.g. multiple parameter rows feeding one formula, like
+  # child_dependent_care's percent_of_fed_cdctc / percent_of_fed_cdctc_estimate /
+  # ny_pre2026_federal_brackets) is treated as special and excluded from the generic loop.
+  
+  method_counts <- state_credits %>%
+    dplyr::filter(!is.na(calculation_method)) %>%
+    dplyr::group_by(variable_name) %>%
+    dplyr::summarise(n_methods = dplyr::n_distinct(calculation_method), .groups = "drop")
+  
+  multi_method_credit_vars <- method_counts %>%
+    dplyr::filter(n_methods > 1) %>%
+    dplyr::pull(variable_name)
+  
+  # Variables consumed only as auxiliary parameters by a dedicated handler (never a
+  # standalone credit column produced by the generic per-filing-status/bracket loop).
+  auxiliary_credit_param_vars <- c(
+    "early_childhood_pct", "early_childhood_max"
+  )
+  
+  # Variables whose calculation is fully delegated to a dedicated apply_*()/calculate_*()
+  # handler further below, even if they currently have only one method row.
+  delegated_credit_vars <- c(
+    "child_dependent_care",
+    "property_tax_credit"
+  )
+  
+  special_credit_vars <- union(
+    multi_method_credit_vars,
+    union(auxiliary_credit_param_vars, delegated_credit_vars)
+  )
   
   credit_vars <- state_credits %>%
-    dplyr::filter(!grepl("^special_", calculation_method)) %>%
     dplyr::pull(variable_name) %>%
     unique() %>%
-    setdiff(c("dummy", special_param_vars))
-  
+    setdiff(c("dummy", special_credit_vars))  
   calculations_df <- calculations_df %>%
     dplyr::mutate(
       state_nonrefundable_credits = 0,
@@ -486,8 +536,7 @@ calculate_state_tax_credits <- function(calculations_df,
   # Special-case credit formulas
   # These handlers add state-specific credits not representable in the generic
   # loop via a single method/value mapping.
-
-    if ("special_ca_eitc" %in% state_credits$calculation_method) {
+  if ("special_ca_eitc" %in% state_credits$calculation_method) {
     calculations_df <- apply_CA_eitc(
       calculations_df  = calculations_df,
       state_eitc_lookup = state_eitc_lookup
@@ -499,7 +548,7 @@ calculate_state_tax_credits <- function(calculations_df,
   if ("special_ca_yctc" %in% state_credits$calculation_method) {
     calculations_df <- apply_CA_yctc(
       calculations_df      = calculations_df,
-      tax_state_credits_df = tax_state_credits_df
+      tax_state_credits_df = state_credits
     )
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_refundable_credits = state_refundable_credits + credit_young_child_tax_credit)
@@ -512,6 +561,35 @@ calculate_state_tax_credits <- function(calculations_df,
     )
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_refundable_credits = state_refundable_credits + credit_wftc)
+  }
+  
+  # Child and Dependent Care Credit (state CDCTC) — delegated regardless of whether
+  # its rows use "special_" method names, since detection is now variable_name-based.
+  if ("child_dependent_care" %in% state_credits$variable_name) {
+    calculations_df <- calculate_state_cdctc_credit(
+      calculations_df      = calculations_df,
+      tax_state_credits_df = state_credits
+    )
+    
+    cdctc_refundable <- unique(
+      state_credits %>%
+        dplyr::filter(variable_name == "child_dependent_care") %>%
+        dplyr::pull(refundable)
+    )
+    
+    if (length(cdctc_refundable) == 1L && cdctc_refundable == 1L) {
+      calculations_df <- calculations_df %>%
+        dplyr::mutate(
+          state_refundable_credits =
+            state_refundable_credits + dplyr::coalesce(state_cdctc_credit, 0)
+        )
+    } else {
+      calculations_df <- calculations_df %>%
+        dplyr::mutate(
+          state_nonrefundable_credits =
+            state_nonrefundable_credits + dplyr::coalesce(state_cdctc_credit, 0)
+        )
+    }
   }
   
   # Special-case overrides (IA combined credit cap rule)

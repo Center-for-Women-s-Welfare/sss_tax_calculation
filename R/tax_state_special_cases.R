@@ -753,11 +753,11 @@ calculate_state_cdctc_credit <- function(calculations_df, tax_state_credits_df) 
     rows <- cdcc_rows %>% dplyr::filter(calculation_method == "percent_of_fed_cdctc_estimate")
     pct  <- resolve_value_vector(rows)
     
-    if (!"cdctc_credit_estimate" %in% names(calculations_df)) {
-      warning("percent_of_fed_cdctc_estimate requested but cdctc_credit_estimate is missing; defaulting to 0.")
+    if (!"cdctc_estimate" %in% names(calculations_df)) {
+      warning("percent_of_fed_cdctc_estimate requested but cdctc_estimate is missing; defaulting to 0.")
       base_estimate <- rep(0, nrow(calculations_df))
     } else {
-      base_estimate <- dplyr::coalesce(calculations_df$cdctc_credit_estimate, 0)
+      base_estimate <- dplyr::coalesce(calculations_df$cdctc_estimate, 0)
     }
     
     credit <- dplyr::coalesce(pct, 0) * base_estimate
@@ -786,40 +786,8 @@ calculate_state_cdctc_credit <- function(calculations_df, tax_state_credits_df) 
 #' @param tax_state_credits_df State credit parameters containing `property_tax_credit`
 #'   rows with `fixed` (credit value) methods
 #' @return Dataframe with `property_tax_credit` column added
-apply_property_tax_credit <- function(calculations_df, tax_state_credits_df) {
-  if (nrow(state_eitc_params) == 0L) {
-    return(calculations_df %>% dplyr::mutate(credit_wftc = 0))
-  }
-  
-  params <- state_eitc_params %>%
-    dplyr::mutate(children = pmin(children, 3L)) %>%
-    dplyr::select(filing_status, children, max_credit, phase_out_start,
-                  phase_out_end, phase_out_rate, min_credit)
-  
-  calculations_df %>%
-    dplyr::mutate(
-      wftc_filing_status = dplyr::if_else(household_type == "married", "married", "single"),
-      wftc_children      = pmin(children, 3L)
-    ) %>%
-    dplyr::left_join(
-      params,
-      by           = c("wftc_filing_status" = "filing_status", "wftc_children" = "children"),
-      relationship = "many-to-one"
-    ) %>%
-    dplyr::mutate(
-      credit_wftc = dplyr::case_when(
-        is.na(max_credit)                  ~ 0,
-        starting_income <= phase_out_start  ~ max_credit,
-        starting_income >  phase_out_end    ~ 0,
-        TRUE ~ pmax(
-          max_credit - phase_out_rate * (starting_income - phase_out_start),
-          min_credit
-        )
-      )
-    ) %>%
-    dplyr::select(-wftc_filing_status, -wftc_children, -max_credit,
-                  -phase_out_start, -phase_out_end, -phase_out_rate, -min_credit)
-}
+# apply_property_tax_credit <- function(calculations_df, tax_state_credits_df) {
+# }
 
 
 
