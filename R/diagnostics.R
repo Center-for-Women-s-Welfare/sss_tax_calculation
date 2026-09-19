@@ -42,6 +42,14 @@ print_convergence_summary <- function(df, debug = FALSE) {
       cat("Non-converged row indices:", which(!df$converged), "\n")
     }
   }
+  cat("\n=== Mean Tax Components ===\n")
+  cat(sprintf("Federal payroll: $%.2f\n", mean(.nz(df$total_fed_payroll_tax), na.rm = TRUE)))
+  cat(sprintf("State payroll:   $%.2f\n", mean(.nz(df$state_payroll_tax), na.rm = TRUE)))
+  cat(sprintf("Local income:    $%.2f\n", mean(.nz(df$local_income_tax), na.rm = TRUE)))   # NEW
+  cat(sprintf("Federal net:     $%.2f\n", mean(.nz(df$federal_tax_liability_with_refund), na.rm = TRUE)))
+  cat(sprintf("State net:       $%.2f\n",
+              mean(dplyr::coalesce(df$state_tax_liability_with_refund,
+                                   -dplyr::coalesce(df$state_refundable_credits, 0)), na.rm = TRUE)))
   
   cat("===========================\n\n")
 }

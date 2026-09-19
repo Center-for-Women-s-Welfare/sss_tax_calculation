@@ -5,6 +5,92 @@
 # SHARED TAX HELPERS
 # ============================================================================
 
+# ---------- BRACKET LOOKUP HELPER -----------------------------------
+
+# Match each df row to its income bracket value using findInterval().
+# Tries exact filing_status first; falls back to "all" for unmatched rows.
+# This replaces the per-iteration fuzzyjoin in the generic credit loop.
+#
+# If number of children is provided, it will first try to match rows with the 
+# exact num_children value, then fall back to rows with num_children == NA.
+#
+# bracket_df must have columns: filing_status, income_min, income_max, value.
+# Returns a numeric vector length n with NA where no bracket matched.
+.bracket_lookup <- function(income, filing_status, bracket_df, children = NULL) {
+  n      <- length(income)
+  result <- rep(NA_real_, n)
+  
+  bracket_df <- bracket_df %>%
+    dplyr::mutate(
+      filing_status = dplyr::if_else(
+        is.na(filing_status) | trimws(filing_status) == "", "all",
+        as.character(filing_status)
+      )
+    )
+  
+  if (!"num_children" %in% names(bracket_df)) {
+    bracket_df$num_children <- NA_real_
+  }
+  bracket_df <- bracket_df %>%
+    dplyr::mutate(num_children = suppressWarnings(as.numeric(num_children)))
+  
+  has_child_filter <- !is.null(children)
+  
+  lookup_subset <- function(idx_rows, rows_df) {
+    if (length(idx_rows) == 0L || nrow(rows_df) == 0L) return(invisible(NULL))
+    
+    rows_df <- rows_df %>% dplyr::arrange(income_min)
+    
+    idx         <- findInterval(income[idx_rows], rows_df$income_min)
+    clipped_idx <- pmax(pmin(idx, nrow(rows_df)), 1L)
+    in_range    <- idx >= 1L & idx <= nrow(rows_df) &
+      income[idx_rows] <= rows_df$income_max[clipped_idx]
+    
+    hit_rows <- idx_rows[in_range]
+    hit_vals <- as.numeric(rows_df$value[clipped_idx[in_range]])
+    
+    can_fill <- is.na(result[hit_rows])
+    result[hit_rows[can_fill]] <<- hit_vals[can_fill]
+  }
+  
+  fs_levels <- c(setdiff(unique(bracket_df$filing_status), "all"), "all")
+  
+  for (fs in fs_levels) {
+    fs_rows <- if (fs == "all") {
+      bracket_df %>% dplyr::filter(filing_status == "all")
+    } else {
+      bracket_df %>% dplyr::filter(filing_status == fs)
+    }
+    
+    idx_rows <- if (fs == "all") which(is.na(result)) else which(filing_status == fs)
+    if (length(idx_rows) == 0L || nrow(fs_rows) == 0L) next
+    
+    if (has_child_filter) {
+      child_vals <- children[idx_rows]
+      
+      # exact child-specific rows
+      exact_child_rows <- fs_rows %>% dplyr::filter(!is.na(num_children))
+      for (cv in unique(child_vals)) {
+        cv_idx  <- idx_rows[child_vals == cv]
+        cv_rows <- exact_child_rows %>% dplyr::filter(num_children == cv)
+        lookup_subset(cv_idx, cv_rows)
+      }
+      
+      # fallback rows where num_children is NA
+      still_unmatched <- idx_rows[is.na(result[idx_rows])]
+      fallback_rows   <- fs_rows %>% dplyr::filter(is.na(num_children))
+      lookup_subset(still_unmatched, fallback_rows)
+    } else {
+      # old behavior
+      lookup_subset(idx_rows, fs_rows)
+    }
+  }
+  
+  result
+}
+
+
+
 #' Calculate Tax from Progressive Brackets
 #'
 #' Calculates income tax using progressive tax brackets. For each bracket,
@@ -98,6 +184,10 @@ apply_calculation_method <- function(value_vector, method, calculations_df, var_
     v * calculations_df$eitc_credit
   } else if (method == "percent_of_fed_cdctc") {
     v * calculations_df$cdctc_credit
+  } else if (method == "percent_of_fed_cdctc_estimate") {
+    v * calculations_df$cdctc_estimate
+  } else if (method == "bracket") {
+    v
   } else if (strict) {
     stop(glue::glue("Unknown calculation_method '{method}' for '{var_name}'."))
   } else {
@@ -119,7 +209,7 @@ apply_calculation_method <- function(value_vector, method, calculations_df, var_
 #' @return Named list of payroll tax parameters
 load_fed_payroll_parameters <- function(tax_fed_payroll_df, year) {
   params_df <- tax_fed_payroll_df %>%
-    filter(year == !!year)
+    filter(sss_year == !!year)
 
   if (nrow(params_df) == 0) {
     stop(paste("No payroll parameters found for year", year))
@@ -329,7 +419,7 @@ calculate_federal_income_tax <- function(df, federal_standard_deduction) {
         household_type == "single_parent" ~ federal_standard_deduction$single_parent,
         household_type == "single_adult"  ~ federal_standard_deduction$single_adult
       ),
-      esi_premium_deduction = health_ins_premium * 12,
+      esi_premium_deduction = health_ins_premium * 12, # employer-sponsored insurance premiums are annualized
       total_fed_deductions  = fed_sd + esi_premium_deduction,
       taxable_income        = pmax(starting_income - total_fed_deductions, 0),
       filing_status         = household_type
