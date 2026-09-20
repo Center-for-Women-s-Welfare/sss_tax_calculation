@@ -21,8 +21,13 @@ solve_starting_income_iterative <- function(df,
                                             tolerance = 1.0,
                                             damping = 0.5,
                                             debug = FALSE) {
-  
-  validate_input(df, year, state)
+
+  # Needed if state = NULL, since local tax calculations still require a tax_rate_local column.  
+  if (!"tax_rate_local" %in% names(df)) {
+    df$tax_rate_local <- 0
+  }
+
+    validate_input(df, year, state)
   
   if (!is.null(state)) {
     # Load all state-specific parameter tables once, outside the iteration loop.
