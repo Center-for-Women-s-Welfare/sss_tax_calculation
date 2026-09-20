@@ -173,7 +173,7 @@ calculate_state_taxable_income <- function(calculations_df,
   
   # Auxiliary/parameter-only variables that a dedicated handler reads directly
   # (they should never be added as an ordinary deduction column via the generic loop).
-  auxiliary_param_vars <- c(
+  auxiliary_param_vars <- c("renters_deduction",
     "low_middle_income_exemption",
     "lmi_agi_limit", "lmi_base_income", "lmi_phaseout_rate", "lmi_base_exemption",
     "property_tax_deduction",
@@ -181,7 +181,8 @@ calculate_state_taxable_income <- function(calculations_df,
     "property_tax_deduction_cap", "property_tax_deduction_choice"
   )
   
-  special_cases <- union(multi_method_vars, auxiliary_param_vars)  general_vars  <- setdiff(calculation_vars, special_cases)
+  special_cases <- union(multi_method_vars, auxiliary_param_vars)  
+  general_vars  <- setdiff(calculation_vars, special_cases)
   
   for (var in general_vars) {
     rows   <- state_adjustments %>% dplyr::filter(variable_name == var)

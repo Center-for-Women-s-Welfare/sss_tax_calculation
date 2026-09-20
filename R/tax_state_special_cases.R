@@ -3,6 +3,131 @@
 
 # ---------- HELPERS --------------------------------
 
+#' Join a special-case parameter by filing status
+#'
+#' Exact filing-status matches take precedence over filing_status == "all".
+#' Raises an error when duplicate values exist for the same parameter and
+#' filing status.
+.join_special_case_parameter <- function(calculations_df,
+                                         state_adjustments,
+                                         variable_names,
+                                         calculation_method,
+                                         output_col) {
+  if (!"state_filing_status" %in% names(calculations_df)) {
+    stop(
+      "`calculations_df` must contain `state_filing_status` before applying special-case parameters.",
+      call. = FALSE
+    )
+  }
+  
+  parameter_rows <- state_adjustments %>%
+    dplyr::filter(
+      .data$variable_name %in% variable_names,
+      .data$calculation_method == calculation_method
+    ) %>%
+    dplyr::mutate(
+      filing_status = dplyr::if_else(
+        is.na(.data$filing_status) |
+          trimws(as.character(.data$filing_status)) == "",
+        "all",
+        trimws(as.character(.data$filing_status))
+      ),
+      value = suppressWarnings(as.numeric(.data$value))
+    ) %>%
+    dplyr::select(.data$filing_status, .data$value)
+  
+  if (nrow(parameter_rows) == 0L) {
+    warning(
+      sprintf(
+        "No parameter found for variable_name '%s' and calculation_method '%s'.",
+        paste(variable_names, collapse = ", "),
+        calculation_method
+      ),
+      call. = FALSE
+    )
+    
+    calculations_df[[output_col]] <- NA_real_
+    return(calculations_df)
+  }
+  
+  duplicate_rows <- parameter_rows %>%
+    dplyr::count(.data$filing_status) %>%
+    dplyr::filter(.data$n > 1L)
+  
+  if (nrow(duplicate_rows) > 0L) {
+    stop(
+      sprintf(
+        paste0(
+          "Multiple values found for variable_name '%s', ",
+          "calculation_method '%s', filing_status '%s'."
+        ),
+        paste(variable_names, collapse = ", "),
+        calculation_method,
+        paste(duplicate_rows$filing_status, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  
+  exact_rows <- parameter_rows %>%
+    dplyr::filter(.data$filing_status != "all") %>%
+    dplyr::rename(
+      !!paste0(output_col, "_exact") := .data$value
+    )
+  
+  fallback_rows <- parameter_rows %>%
+    dplyr::filter(.data$filing_status == "all") %>%
+    dplyr::select(.data$value) %>%
+    dplyr::rename(
+      !!paste0(output_col, "_all") := .data$value
+    )
+  
+  if (nrow(fallback_rows) > 1L) {
+    stop(
+      sprintf(
+        paste0(
+          "Multiple fallback values found for variable_name '%s', ",
+          "calculation_method '%s'."
+        ),
+        paste(variable_names, collapse = ", "),
+        calculation_method
+      ),
+      call. = FALSE
+    )
+  }
+  
+  result <- calculations_df %>%
+    dplyr::left_join(
+      exact_rows,
+      by = c("state_filing_status" = "filing_status")
+    )
+  
+  exact_col <- paste0(output_col, "_exact")
+  fallback_col <- paste0(output_col, "_all")
+  
+  if (nrow(fallback_rows) == 1L) {
+    fallback_value <- fallback_rows[[fallback_col]][[1]]
+    
+    result <- result %>%
+      dplyr::mutate(
+        !!output_col := dplyr::coalesce(
+          .data[[exact_col]],
+          fallback_value
+        )
+      )
+  } else {
+    result <- result %>%
+      dplyr::mutate(
+        !!output_col := .data[[exact_col]]
+      )
+  }
+  
+  result %>%
+    dplyr::select(
+      -dplyr::any_of(c(exact_col, fallback_col))
+    )
+}
+
 #' Validate grouped special-case parameter rows
 #'
 #' For a given `variable_name`, checks that required `calculation_method` rows
@@ -61,74 +186,105 @@
 
 #' Apply Renters Deduction (State Special Case)
 #'
-#' Computes a state-specific renters deduction when taxable-income adjustment
-#' parameters include `variable_name == "renters_deduction"`.
+#' Computes a state-specific renters deduction using filing-status-specific
+#' parameters. Exact filing-status matches are used first, with filing_status
+#' == "all" as a fallback.
 #'
-#' Supports grouped parameter rows distinguished by `calculation_method`:
-#' - If `renters_formula_min` is present, applies:
-#'   `pmin(12 * housing_cost, renters_max)`
-#' - If both `renters_formula_cap` and `renters_formula_rate` are present,
-#'   applies:
-#'   `pmin(12 * housing_cost * renters_rate, renters_max)`
+#' Supported formulas:
+#' - renters_formula_min:
+#'   pmin(12 * housing_cost, renters_max)
+#' - renters_formula_cap plus renters_formula_rate:
+#'   pmin(12 * housing_cost * renters_rate, renters_max)
 #'
-#' For grouped-method schemas, `renters_max` is taken from:
-#' - `renters_formula_min` (min formula), or
-#' - `renters_formula_cap` (cap+rate formula)
-#' and `renters_rate` is taken from `renters_formula_rate` for cap+rate.
-#'
-#' Called by [calculate_state_taxable_income()] after the general adjustment loop.
-#'
-#' @param calculations_df Dataframe with `housing_cost`
+#' @param calculations_df Dataframe with housing_cost and state_filing_status
 #' @param state_adjustments Dataframe of state TI-adjustment rows already
-#'   filtered to taxable_income_subtraction type
-#' @param calculation_vars Character vector of all variable_name values present
-#'   in state_adjustments
-#' @return Dataframe with a `renters_deduction` column added when applicable,
-#'   otherwise unchanged
-apply_renters_deduction <- function(calculations_df, state_adjustments, calculation_vars) {
-  if (!"renters_deduction" %in% calculation_vars) return(calculations_df)
+#'   filtered to taxable_income_subtraction
+#' @param calculation_vars Character vector of variable names present in
+#'   state_adjustments
+#' @return Dataframe with renters_deduction added when applicable
+apply_renters_deduction <- function(calculations_df,
+                                    state_adjustments,
+                                    calculation_vars) {
+  if (!"renters_deduction" %in% calculation_vars) {
+    return(calculations_df)
+  }
+  
+  if (!"housing_cost" %in% names(calculations_df)) {
+    stop(
+      "`calculations_df` must contain `housing_cost` to calculate renters_deduction.",
+      call. = FALSE
+    )
+  }
   
   renters_rows <- state_adjustments %>%
-    dplyr::filter(variable_name == "renters_deduction")
+    dplyr::filter(.data$variable_name == "renters_deduction")
   
-  renters_methods <- unique(stats::na.omit(renters_rows$calculation_method))
+  renters_methods <- renters_rows %>%
+    dplyr::pull(.data$calculation_method) %>%
+    stats::na.omit() %>%
+    unique()
   
-  # Priority: if explicit min formula exists, use it.
   if ("renters_formula_min" %in% renters_methods) {
-    vals <- .get_required_method_values(
-      rows_df = renters_rows,
-      variable_name = "renters_deduction",
-      required_methods = c("renters_formula_min"),
-      fn_name = "apply_renters_deduction"
+    calculations_df <- .join_special_case_parameter(
+      calculations_df    = calculations_df,
+      state_adjustments  = state_adjustments,
+      variable_names     = "renters_deduction",
+      calculation_method = "renters_formula_min",
+      output_col         = "renters_max"
     )
-    if (is.null(vals)) return(calculations_df)
-    
-    renters_max <- vals[["renters_formula_min"]]
     
     return(
       calculations_df %>%
         dplyr::mutate(
-          renters_deduction = pmin(12 * housing_cost, renters_max)
-        )
+          renters_deduction = pmin(
+            12 * .data$housing_cost,
+            dplyr::coalesce(.data$renters_max, 0)
+          )
+        ) %>%
+        dplyr::select(-.data$renters_max)
     )
   }
   
-  # Otherwise require cap + rate formula.
-  vals <- .get_required_method_values(
-    rows_df = renters_rows,
-    variable_name = "renters_deduction",
-    required_methods = c("renters_formula_cap", "renters_formula_rate"),
-    fn_name = "apply_renters_deduction"
-  )
-  if (is.null(vals)) return(calculations_df)
+  if (!all(c("renters_formula_cap", "renters_formula_rate") %in% renters_methods)) {
+    warning(
+      paste0(
+        "apply_renters_deduction: variable_name 'renters_deduction' ",
+        "must contain either renters_formula_min or both ",
+        "renters_formula_cap and renters_formula_rate. ",
+        "Returning calculations_df unchanged."
+      ),
+      call. = FALSE
+    )
+    
+    return(calculations_df)
+  }
   
-  renters_max  <- vals[["renters_formula_cap"]]
-  renters_rate <- vals[["renters_formula_rate"]]
+  calculations_df <- .join_special_case_parameter(
+    calculations_df    = calculations_df,
+    state_adjustments  = state_adjustments,
+    variable_names     = "renters_deduction",
+    calculation_method = "renters_formula_cap",
+    output_col         = "renters_max"
+  )
+  
+  calculations_df <- .join_special_case_parameter(
+    calculations_df    = calculations_df,
+    state_adjustments  = state_adjustments,
+    variable_names     = "renters_deduction",
+    calculation_method = "renters_formula_rate",
+    output_col         = "renters_rate"
+  )
   
   calculations_df %>%
     dplyr::mutate(
-      renters_deduction = pmin(12 * housing_cost * renters_rate, renters_max)
-    )
+      renters_deduction = pmin(
+        12 *
+          .data$housing_cost *
+          dplyr::coalesce(.data$renters_rate, 0),
+        dplyr::coalesce(.data$renters_max, 0)
+      )
+    ) %>%
+    dplyr::select(-.data$renters_max, -.data$renters_rate)
 }
 
 #' Apply Commuter Deduction (State Special Case)

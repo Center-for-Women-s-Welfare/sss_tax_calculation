@@ -129,7 +129,7 @@ load_state_tax_params <- function(year, state) {
     
     # new local-tax entries
     local_tax_type          = local_tax_type,            # scalar string
-    local_income_brackets   = local_income_brackets      # tibble(), or bracket table when needed
+    local_income_tax_brackets   = local_income_tax_brackets      # tibble(), or bracket table when needed
   )
   }
 
