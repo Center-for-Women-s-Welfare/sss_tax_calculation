@@ -2,7 +2,7 @@
 % Please edit documentation in R/tax_state_special_cases.R
 \name{.resolve_base_credit}
 \alias{.resolve_base_credit}
-\title{Resolve the Base Childcare Credit Column Name}
+\title{Apply Special Property Tax Credit}
 \usage{
 .resolve_base_credit(
   df,
@@ -13,14 +13,26 @@
 \item{df}{Dataframe of computed credit columns}
 
 \item{candidates}{Character vector of candidate column names, tried in order}
+
+\item{calculations_df}{Dataframe with household_type and
+starting_income}
+
+\item{tax_state_credits_df}{State credit parameters containing \code{property_tax_credit}
+rows with \code{fixed} (credit value) methods}
 }
 \value{
-The resolved column name as a string, or NULL if no match is found
-}
-\description{
+Dataframe with \code{property_tax_credit} column added
+Resolve the Base Childcare Credit Column Name
+
 Identifies which computed credit column represents a state's base
 child-and-dependent-care credit, trying a prioritized list of candidate
 names before falling back to a regex match. Intended for use by
 special-case rules (e.g., \code{\link[=apply_IA_credit_max_rule]{apply_IA_credit_max_rule()}}) that need to
 reconcile a state CDCTC-style credit against another childcare credit.
+
+The resolved column name as a string, or NULL if no match is found
+}
+\description{
+Computes a flat refundable property tax credit for a starting_income meeting
+the set eligibility minimum.
 }
