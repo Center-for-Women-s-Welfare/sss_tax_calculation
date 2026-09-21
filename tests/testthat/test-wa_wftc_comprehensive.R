@@ -12,9 +12,6 @@ library(dplyr)  # Load dplyr BEFORE anything else that might cause conflicts
 
 YEAR <- 2026
 
-# Load local development copy of tax branch rather than published sssTaxCalculation package
-devtools::load_all("C:/Users/ksegar/Desktop/local_dev/sss_tax_calculation")
-
 # ============================================================================
 # UNIT TESTS: apply_state_eitc_style_credit() function
 # ============================================================================

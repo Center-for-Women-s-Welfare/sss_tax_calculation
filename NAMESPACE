@@ -28,7 +28,6 @@ importFrom(dplyr,
 importFrom(readr,read_csv)
 importFrom(rlang,
   .data,
-  `!!`,
   sym
 )
 importFrom(tidyr,

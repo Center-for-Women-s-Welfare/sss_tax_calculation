@@ -3,11 +3,12 @@
 
 # ---------- HELPERS --------------------------------
 
-#' Join a special-case parameter by filing status
-#'
-#' Exact filing-status matches take precedence over filing_status == "all".
-#' Raises an error when duplicate values exist for the same parameter and
-#' filing status.
+#' @noRd
+# Join a special-case parameter by filing status
+#
+# Exact filing-status matches take precedence over filing_status == "all".
+# Raises an error when duplicate values exist for the same parameter and
+# filing status.
 .join_special_case_parameter <- function(calculations_df,
                                          state_adjustments,
                                          variable_names,
@@ -128,17 +129,18 @@
     )
 }
 
-#' Validate grouped special-case parameter rows
-#'
-#' For a given `variable_name`, checks that required `calculation_method` rows
-#' exist and that their `value` entries are non-missing, returning named values
-#' when valid.
-#'
-#' @param rows_df Dataframe already filtered to one `variable_name`
-#' @param variable_name Character scalar; used in warning messages
-#' @param required_methods Character vector of required calculation_method names
-#' @param fn_name Character scalar; calling function name for warnings
-#' @return Named numeric vector of required method values, or `NULL` if invalid
+#' @noRd
+# Validate grouped special-case parameter rows
+#
+# For a given `variable_name`, checks that required `calculation_method` rows
+# exist and that their `value` entries are non-missing, returning named values
+# when valid.
+#
+# @param rows_df Dataframe already filtered to one `variable_name`
+# @param variable_name Character scalar; used in warning messages
+# @param required_methods Character vector of required calculation_method names
+# @param fn_name Character scalar; calling function name for warnings
+# @return Named numeric vector of required method values, or `NULL` if invalid
 .get_required_method_values <- function(rows_df, variable_name, required_methods, fn_name) {
   methods <- unique(stats::na.omit(rows_df$calculation_method))
   missing_methods <- setdiff(required_methods, methods)
@@ -949,17 +951,18 @@ calculate_state_cdctc_credit <- function(calculations_df, tax_state_credits_df) 
 
 # ---------- CREDIT RESOLUTION HELPER --------------------------------
 
-#' Resolve the Base Childcare Credit Column Name
-#'
-#' Identifies which computed credit column represents a state's base
-#' child-and-dependent-care credit, trying a prioritized list of candidate
-#' names before falling back to a regex match. Intended for use by
-#' special-case rules (e.g., [apply_IA_credit_max_rule()]) that need to
-#' reconcile a state CDCTC-style credit against another childcare credit.
-#'
-#' @param df Dataframe of computed credit columns
-#' @param candidates Character vector of candidate column names, tried in order
-#' @return The resolved column name as a string, or NULL if no match is found
+#' @noRd
+# Resolve the Base Childcare Credit Column Name
+#
+# Identifies which computed credit column represents a state's base
+# child-and-dependent-care credit, trying a prioritized list of candidate
+# names before falling back to a regex match. Intended for use by
+# special-case rules (e.g., [apply_IA_credit_max_rule()]) that need to
+# reconcile a state CDCTC-style credit against another childcare credit.
+#
+# @param df Dataframe of computed credit columns
+# @param candidates Character vector of candidate column names, tried in order
+# @return The resolved column name as a string, or NULL if no match is found
 .resolve_base_credit <- function(df, candidates = c("credit_state_cdctc", "credit_cdctc", "credit_cdcc")) {
   cols    <- names(df)
   hit     <- candidates[candidates %in% cols]
