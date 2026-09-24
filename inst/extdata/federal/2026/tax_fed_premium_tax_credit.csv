@@ -1,4 +1,4 @@
-tax_year,income_pct_fpl_min,income_pct_fpl_max,required_income_rate_min,required_income_rate_max
+effective_year,income_pct_fpl_min,income_pct_fpl_max,required_income_rate_min,required_income_rate_max
 2025,0,150,0,0
 2025,150,200,0,0.02
 2025,200,250,0.02,0.04
