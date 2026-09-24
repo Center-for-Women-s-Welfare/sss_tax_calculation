@@ -23,7 +23,9 @@ load_federal_tax_params <- function(year) {
     fed_payroll  = readr::read_csv(file.path(fed_tax_dir, "tax_fed_payroll.csv"),  show_col_types = FALSE),
     fed_credits  = readr::read_csv(file.path(fed_tax_dir, "tax_fed_credits.csv"),  show_col_types = FALSE),
     fed_brackets = readr::read_csv(file.path(fed_tax_dir, "tax_fed_income_brackets.csv"), show_col_types = FALSE),
-    fed_sd       = readr::read_csv(file.path(fed_tax_dir, "tax_fed_sd.csv"),       show_col_types = FALSE)
+    fed_sd       = readr::read_csv(file.path(fed_tax_dir, "tax_fed_sd.csv"),       show_col_types = FALSE),
+    fed_premium_tax_credit = readr::read_csv(file.path(fed_tax_dir, "tax_fed_premium_tax_credit.csv"), show_col_types = FALSE),
+    fed_poverty_line = readr::read_csv(file.path(fed_tax_dir, "tax_fed_poverty_line.csv"), show_col_types = FALSE)
   )
 }
 
