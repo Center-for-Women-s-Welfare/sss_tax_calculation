@@ -60,7 +60,7 @@ solve_starting_income_iterative <- function(df,
       "."
     )
   }
-  
+
   use_marketplace_premium <- health_insurance_scenario %in% c(
     "marketplace_unsubsidized",
     "marketplace_ptc"

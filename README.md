@@ -117,6 +117,7 @@ Supported scenario values and mappings:
 If `health_insurance_scenario` is present in the input row, it is used as the source of truth.
 If absent, the solver argument `health_insurance_scenario` is used for backward compatibility.
 `health_insurance_premium_used` is preferred whenever present; otherwise the solver falls back to legacy premium columns.
+Marketplace scenarios require marketplace-compatible premiums (`health_insurance_premium_used` or `health_ins_market`).
 
 ESI deduction policy: only rows with employer coverage receive the federal ESI premium deduction.
 Marketplace rows do not receive the ESI deduction.
