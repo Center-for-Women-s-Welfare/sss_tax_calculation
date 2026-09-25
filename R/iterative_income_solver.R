@@ -264,7 +264,7 @@ solve_starting_income_iterative <- function(df,
 
   for (iter in 1:max_iterations) {
     df$previous_income <- df$starting_income
-    
+
     df <- recompute_derived(df)
     
     raw_new_income <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
