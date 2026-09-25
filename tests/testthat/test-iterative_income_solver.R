@@ -403,6 +403,29 @@ test_that("premium tax credit applies only to marketplace_ptc and affects result
   expect_true(out_ptc$starting_income < out_unsub$starting_income)
 })
 
+test_that("marketplace scenarios use marketplace premium source", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- "marketplace_unsubsidized"
+  df$health_ins_premium <- 111
+  df$health_ins_market <- 555
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_equal(out$health_insurance_premium_used, 555)
+  expect_equal(out$esi_premium_deduction, 0)
+})
+
+test_that("marketplace scenarios fail clearly when marketplace premium is missing", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- "marketplace_ptc"
+  df$health_ins_market <- NA_real_
+  df$health_insurance_premium_used <- NA_real_
+
+  expect_error(
+    solve_starting_income_iterative(df, year = YEAR),
+    "Marketplace scenario rows require health_insurance_premium_used or health_ins_market"
+  )
+})
+
 test_that("premium tax credit is recomputed as starting income changes", {
   df <- create_health_scenario_df()[1, ]
   df <- dplyr::select(df, -health_ins_premium)
@@ -427,6 +450,38 @@ test_that("premium tax credit is recomputed as starting income changes", {
   expect_true(is.finite(out_short$premium_tax_credit))
   expect_true(is.finite(out_long$premium_tax_credit))
   expect_true(abs(out_short$premium_tax_credit - out_long$premium_tax_credit) > 0.01)
+})
+
+test_that("premium tax credit does not over-credit unmatched required-income rows", {
+  calculations_df <- data.frame(
+    household_size = 1L,
+    starting_income = 100000,
+    health_insurance_premium_used = 600,
+    stringsAsFactors = FALSE
+  )
+  fed_poverty_line <- data.frame(
+    fpl_year = 2025,
+    fpl_area = "FORTY_EIGHT_DC",
+    hh_size = 1L,
+    fpl = 15060
+  )
+  fed_premium_tax_credit <- data.frame(
+    effective_year = 2026,
+    income_pct_fpl_min = 0,
+    income_pct_fpl_max = 200,
+    required_income_rate_min = 0,
+    required_income_rate_max = 0.02
+  )
+
+  out <- calculate_premium_tax_credit(
+    calculations_df = calculations_df,
+    fed_poverty_line = fed_poverty_line,
+    fed_premium_tax_credit = fed_premium_tax_credit,
+    effective_year = 2026
+  )
+
+  expect_true(is.na(out$required_income_rate))
+  expect_equal(out$premium_tax_credit, 0)
 })
 
 test_that("invalid health insurance scenario names fail clearly", {

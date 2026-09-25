@@ -205,11 +205,15 @@ calculate_premium_tax_credit <- function(calculations_df,
       monthly_premium_selected = pmax(dplyr::coalesce(.data[[premium_col]], 0), 0),
       annual_selected_premium = monthly_premium_selected * 12,
       annual_required_contribution =
-        pmax(dplyr::coalesce(.data$required_income_rate, 0), 0) *
-        pmax(dplyr::coalesce(.data$starting_income, 0), 0),
+        dplyr::if_else(
+          is.na(.data$required_income_rate),
+          NA_real_,
+          pmax(.data$required_income_rate, 0) *
+            pmax(dplyr::coalesce(.data$starting_income, 0), 0)
+        ),
       premium_tax_credit_raw = annual_selected_premium - annual_required_contribution,
       premium_tax_credit = dplyr::if_else(
-        is.finite(premium_tax_credit_raw),
+        is.finite(premium_tax_credit_raw) & !is.na(.data$required_income_rate),
         pmax(premium_tax_credit_raw, 0),
         0
       )

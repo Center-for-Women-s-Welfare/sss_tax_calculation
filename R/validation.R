@@ -107,6 +107,15 @@ validate_input <- function(df, year = NULL, state = NULL, methods_present = NULL
         "health_ins_premium, or health_ins_market."
       )
     }
+  present_health_cols <- intersect(health_premium_cols, names(df))
+  row_has_health_premium <- rowSums(!is.na(df[present_health_cols])) > 0
+  if (any(!row_has_health_premium)) {
+    stop(
+      "Each row must provide at least one non-missing health insurance premium value ",
+      "across health_insurance_premium_used, health_ins_premium, or health_ins_market. ",
+      "Missing rows: ", sum(!row_has_health_premium), "."
+    )
+  }
   # Check for NA values in critical columns
   critical_cols <- c("subtotal2", "subtotal3", "household_type")
   for (col in critical_cols) {

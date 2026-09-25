@@ -77,11 +77,40 @@ solve_starting_income_iterative <- function(df,
   # Use unsubsidized behavior by default and apply PTC only when explicitly tagged
   # as `marketplace_ptc`.
   df$apply_premium_tax_credit <- df$health_insurance_scenario == "marketplace_ptc"
-  if (any(df$apply_premium_tax_credit) &&
-      !("health_insurance_premium_used" %in% names(df) || "health_ins_market" %in% names(df))) {
+
+  premium_used_col <- if ("health_insurance_premium_used" %in% names(df)) {
+    !is.na(df$health_insurance_premium_used)
+  } else {
+    rep(FALSE, nrow(df))
+  }
+  employer_premium_col <- if ("health_ins_premium" %in% names(df)) {
+    !is.na(df$health_ins_premium)
+  } else {
+    rep(FALSE, nrow(df))
+  }
+  marketplace_premium_col <- if ("health_ins_market" %in% names(df)) {
+    !is.na(df$health_ins_market)
+  } else {
+    rep(FALSE, nrow(df))
+  }
+
+  marketplace_scenarios <- c("marketplace", "marketplace_unsubsidized", "marketplace_ptc")
+  marketplace_rows <- df$health_insurance_scenario %in% marketplace_scenarios
+  employer_rows <- df$health_insurance_scenario == "employer"
+
+  invalid_marketplace_rows <- marketplace_rows & !(premium_used_col | marketplace_premium_col)
+  if (any(invalid_marketplace_rows)) {
     stop(
-      "Rows using health_insurance_scenario = 'marketplace_ptc' require ",
-      "health_insurance_premium_used or health_ins_market."
+      "Marketplace scenario rows require health_insurance_premium_used or health_ins_market. ",
+      "Invalid rows: ", sum(invalid_marketplace_rows), "."
+    )
+  }
+
+  invalid_employer_rows <- employer_rows & !(premium_used_col | employer_premium_col)
+  if (any(invalid_employer_rows)) {
+    stop(
+      "Employer scenario rows require health_insurance_premium_used or health_ins_premium. ",
+      "Invalid rows: ", sum(invalid_employer_rows), "."
     )
   }
 
