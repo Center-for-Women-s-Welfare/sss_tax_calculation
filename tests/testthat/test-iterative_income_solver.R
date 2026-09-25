@@ -423,6 +423,8 @@ test_that("existing health_insurance_scenario column type is preserved", {
   out <- solve_starting_income_iterative(df, year = YEAR)
   expect_true(is.factor(out$health_insurance_scenario))
   expect_equal(as.character(out$health_insurance_scenario), "marketplace")
+  expect_equal(out$health_insurance_premium_used, 500)
+  expect_equal(out$esi_premium_deduction, 0)
 })
 
 test_that("marketplace scenarios use marketplace premium source", {
