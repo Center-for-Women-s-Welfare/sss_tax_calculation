@@ -203,20 +203,35 @@ solve_starting_income_iterative <- function(df,
       default_health_insurance_scenario = health_insurance_scenario
     )
     if (any(df$apply_premium_tax_credit)) {
-      df <- calculate_premium_tax_credit(
-        calculations_df = df,
-        fed_poverty_line = fed_poverty_line,
-        fed_premium_tax_credit = fed_premium_tax_credit,
-        effective_year = year,
-        premium_col = "health_insurance_premium_used"
-      )
       df <- df %>%
-        dplyr::mutate(
-          premium_tax_credit = dplyr::if_else(.data$apply_premium_tax_credit, .data$premium_tax_credit, 0)
+        dplyr::mutate(row_id = dplyr::row_number())
+      ptc_rows <- df %>%
+        dplyr::filter(.data$apply_premium_tax_credit) %>%
+        calculate_premium_tax_credit(
+          fed_poverty_line = fed_poverty_line,
+          fed_premium_tax_credit = fed_premium_tax_credit,
+          effective_year = year,
+          premium_col = "health_insurance_premium_used"
+        ) %>%
+        dplyr::select(
+          row_id, fpl, pct_fpl, required_income_rate,
+          monthly_premium_selected, annual_selected_premium,
+          annual_required_contribution, premium_tax_credit_raw,
+          premium_tax_credit
         )
+      df <- df %>%
+        dplyr::left_join(ptc_rows, by = "row_id", relationship = "one-to-one") %>%
+        dplyr::mutate(
+          premium_tax_credit = dplyr::coalesce(.data$premium_tax_credit, 0)
+        ) %>%
+        dplyr::select(-.data$row_id)
     } else {
       df$premium_tax_credit <- 0
     }
+    df <- df %>%
+      dplyr::mutate(
+        premium_tax_credit = dplyr::if_else(.data$apply_premium_tax_credit, .data$premium_tax_credit, 0)
+      )
     df <- calculate_tax_from_brackets(df, federal_tax_brackets,
                                       taxable_income_var = "taxable_income",
                                       filing_status_var  = "filing_status",
