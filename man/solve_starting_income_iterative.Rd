@@ -8,6 +8,7 @@ solve_starting_income_iterative(
   df,
   year,
   state = NULL,
+  health_insurance_scenario = "employer",
   max_iterations = 100,
   tolerance = 1,
   damping = 0.5,
@@ -21,6 +22,11 @@ solve_starting_income_iterative(
 \item{year}{Tax year (e.g., 2026)}
 
 \item{state}{State abbreviation (reserved for future state tax support)}
+
+\item{health_insurance_scenario}{Backward-compatible default scenario used
+when a row does not provide \code{health_insurance_scenario}. Supported values:
+\code{"employer"}, \code{"marketplace"} (treated as unsubsidized marketplace by
+default), \code{"marketplace_unsubsidized"}, and \code{"marketplace_ptc"}.}
 
 \item{max_iterations}{Maximum number of solver iterations (default: 100)}
 

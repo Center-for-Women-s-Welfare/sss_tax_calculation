@@ -4,12 +4,22 @@
 \alias{calculate_federal_income_tax}
 \title{Calculate Federal Income Tax Deductions and Taxable Income}
 \usage{
-calculate_federal_income_tax(df, federal_standard_deduction)
+calculate_federal_income_tax(
+  df,
+  federal_standard_deduction,
+  default_health_insurance_scenario = "employer"
+)
 }
 \arguments{
-\item{df}{Dataframe with starting_income, household_type, health_ins_premium}
+\item{df}{Dataframe with starting_income, household_type, and health-insurance
+premium columns.}
 
 \item{federal_standard_deduction}{Dataframe with standard deductions by filing status}
+
+\item{default_health_insurance_scenario}{Scenario applied when a row does not
+already provide \code{health_insurance_scenario}. Must be one of
+\code{"employer"}, \code{"marketplace"}, \code{"marketplace_unsubsidized"},
+or \code{"marketplace_ptc"}.}
 }
 \value{
 Dataframe with deduction and taxable income columns added
