@@ -92,7 +92,7 @@ solve_starting_income_iterative(
 ```
 
 **Key Changes from Original Design:**
-- Tax parameters are **loaded automatically** from `data/federal/{year}/` CSV files
+- Tax parameters are **loaded automatically** from `inst/extdata/federal/{year}/` CSV files
 - No need to pass `tax_params` parameter
 - Simpler function signature
 
@@ -384,7 +384,7 @@ This will print:
 Tax parameters are stored in CSV files organized by year:
 
 ```
-src/data/federal/2026/
+inst/extdata/federal/2026/
 ├── tax_fed_credits_df.csv       # EITC, CDCTC, CTC parameters
 ├── tax_fed_income_brackets_df.csv  # Federal tax brackets
 ├── tax_fed_payroll_df.csv       # Social Security, Medicare rates
@@ -395,7 +395,7 @@ src/data/federal/2026/
 
 Tax laws change annually. To update for a new year:
 
-1. Create new directory: `src/data/federal/{year}/`
+1. Create new directory: `inst/extdata/federal/{year}/`
 2. Populate with updated CSV files following existing schema
 3. Update tests with new expected values
 4. Run validation suite
