@@ -484,6 +484,29 @@ test_that("premium tax credit does not over-credit unmatched required-income row
   expect_equal(out$premium_tax_credit, 0)
 })
 
+test_that("solver sets premium_tax_credit to zero when PTC schedule does not match", {
+  base_params <- load_federal_tax_params(YEAR)
+  base_params$fed_premium_tax_credit <- data.frame(
+    effective_year = YEAR,
+    income_pct_fpl_min = 0,
+    income_pct_fpl_max = 200,
+    required_income_rate_min = 0,
+    required_income_rate_max = 0.02
+  )
+
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- "marketplace_ptc"
+  df$health_ins_market <- 700
+
+  out <- testthat::with_mocked_bindings(
+    solve_starting_income_iterative(df, year = YEAR),
+    load_federal_tax_params = function(year) base_params
+  )
+
+  expect_equal(out$premium_tax_credit, 0)
+  expect_true(is.finite(out$starting_income))
+})
+
 test_that("invalid health insurance scenario names fail clearly", {
   df <- create_health_scenario_df()[1, ]
   expect_error(
