@@ -227,6 +227,13 @@ solve_starting_income_iterative <- function(df,
         dplyr::select(-.data$row_id)
     } else {
       df$premium_tax_credit <- 0
+      df$fpl <- NA_real_
+      df$pct_fpl <- NA_real_
+      df$required_income_rate <- NA_real_
+      df$monthly_premium_selected <- NA_real_
+      df$annual_selected_premium <- NA_real_
+      df$annual_required_contribution <- NA_real_
+      df$premium_tax_credit_raw <- NA_real_
     }
     df <- df %>%
       dplyr::mutate(
@@ -303,7 +310,8 @@ solve_starting_income_iterative <- function(df,
           pmax(federal_net, 0) +
           pmax(state_net, 0),
         total_credits = pmax(-federal_net, 0) +
-          pmax(-state_net, 0)
+          pmax(-state_net, 0) +
+          coalesce(premium_tax_credit, 0)
       )
 
     raw_new_income         <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
