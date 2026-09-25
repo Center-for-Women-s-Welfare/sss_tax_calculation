@@ -70,34 +70,40 @@ calculate_program_tax <- function(income, rate, cap) {
 #' @return Dataframe with one `payroll_tax_<program>` column per program plus a
 #'   `state_payroll_tax` total column added
 calculate_state_payroll_taxes <- function(calculations_df, tax_state_payroll_df, year, state) {
-
+  
   state_params <- tax_state_payroll_df
-
+  
   if (nrow(state_params) == 0) {
     message("No state payroll taxes for ", state, " in ", year)
     calculations_df$state_payroll_tax <- 0
     return(calculations_df)
   }
-
+  
   programs <- unique(state_params$program)
-
+  
   calculations_df <- calculations_df %>% dplyr::mutate(state_payroll_tax = 0)
-
+  
   for (program in programs) {
+    # Each program can be either:
+    # - flat amount (flat_tax), or
+    # - rate * min(income, wage_cap)
+    # If both exist, flat_tax takes precedence in current implementation.
     rate <- get_state_payroll_param(state_params, program, "rate")
     cap  <- get_state_payroll_param(state_params, program, "wage_cap")
     flat <- get_state_payroll_param(state_params, program, "flat_tax")
-
+    
     tax_column <- paste0("payroll_tax_", gsub(" ", "_", tolower(program)))
-
+    
     calculations_df <- calculations_df %>%
       dplyr::mutate(
+        # Match federal payroll treatment: split married household income evenly.
         income_for_tax = dplyr::if_else(household_type == "married", starting_income / 2, starting_income),
         !!tax_column   := if (!is.na(flat) && flat > 0) flat else calculate_program_tax(income_for_tax, rate, cap),
+        # Accumulate all program-specific payroll taxes into one state total.
         state_payroll_tax = state_payroll_tax + !!rlang::sym(tax_column)
       )
   }
-
+  
   calculations_df <- calculations_df %>% dplyr::select(-income_for_tax)
   return(calculations_df)
 }
@@ -137,49 +143,75 @@ calculate_state_taxable_income <- function(calculations_df,
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_filing_status = household_type)
   }
-
+  
   state_adjustments <- tax_state_adjustments_all_df %>%
     dplyr::filter(type == "taxable_income_subtraction")
-
+  
   state_adjustments <- state_adjustments %>%
     dplyr::mutate(
       calculation_method = trimws(calculation_method),
       filing_status      = trimws(filing_status),
       variable_name      = trimws(variable_name)
     )
-
+  
   calculation_vars <- unique(state_adjustments$variable_name)
-
-  special_cases <- c("renters_deduction", "commuter_deduction", "commuter_threshold",
-                     "renters_rate", "property_tax_deduction")
+  
+  # Instead of a fixed variable-name whitelist, detect "special-case" TI adjustment
+  # variables by whether they have more than one distinct calculation_method for the
+  # same variable_name (e.g. renters_deduction: renters_formula_cap + renters_formula_rate,
+  # or renters_formula_min alone still counts as 1 — see note below), OR whether they are
+  # known auxiliary parameter rows consumed by a dedicated handler rather than applied
+  # directly as a deduction.
+  
+  method_counts <- state_adjustments %>%
+    dplyr::group_by(variable_name) %>%
+    dplyr::summarise(n_methods = dplyr::n_distinct(calculation_method), .groups = "drop")
+  
+  multi_method_vars <- method_counts %>%
+    dplyr::filter(n_methods > 1) %>%
+    dplyr::pull(variable_name)
+  
+  # Auxiliary/parameter-only variables that a dedicated handler reads directly
+  # (they should never be added as an ordinary deduction column via the generic loop).
+  auxiliary_param_vars <- c("renters_deduction",
+    "low_middle_income_exemption",
+    "lmi_agi_limit", "lmi_base_income", "lmi_phaseout_rate", "lmi_base_exemption",
+    "property_tax_deduction",
+    "property_tax_deduction_income_floor", "property_tax_rate",
+    "property_tax_deduction_cap", "property_tax_deduction_choice"
+  )
+  
+  special_cases <- union(multi_method_vars, auxiliary_param_vars)  
   general_vars  <- setdiff(calculation_vars, special_cases)
-
+  
   for (var in general_vars) {
     rows   <- state_adjustments %>% dplyr::filter(variable_name == var)
     method <- unique(rows$calculation_method)
-
+    
     if (length(method) != 1) {
       warning(glue::glue("Variable '{var}' has multiple or missing calculation_method entries."))
       next
     }
-
+    
     if (all(is.na(rows$income_min))) {
-      # Flat value: join on filing status then apply method
+      # Flat parameter by filing status, then transformed by calculation_method.
+      # Example: dependent_exemption may be multiplied by children via method logic.
       value_df <- rows %>% dplyr::select(filing_status, value)
-
+      
       calculations_df <- calculations_df %>%
         dplyr::left_join(value_df, by = c("state_filing_status" = "filing_status"))
-
+      
       calculations_df[[var]] <- apply_calculation_method(
         value_vector    = calculations_df$value,
         method          = method,
         calculations_df = calculations_df,
         var_name        = var
       )
-
+      
       calculations_df <- calculations_df %>% dplyr::select(-value)
     } else {
-      # Bracketed value: fuzzy join on filing status and income range
+      # Bracketed parameter: match by filing status + starting_income range.
+      # Keep first match per row to avoid duplicate bracket joins.
       df_bracketed <- calculations_df %>%
         dplyr::mutate(row_id = dplyr::row_number()) %>%
         fuzzyjoin::fuzzy_left_join(
@@ -194,18 +226,22 @@ calculate_state_taxable_income <- function(calculations_df,
         dplyr::ungroup() %>%
         dplyr::mutate(!!var := value) %>%
         dplyr::select(row_id, !!var)
-
+      
       calculations_df <- calculations_df %>%
         dplyr::mutate(row_id = dplyr::row_number()) %>%
         dplyr::left_join(df_bracketed, by = "row_id") %>%
         dplyr::select(-row_id)
     }
   }
-
+  
   # === Apply special-case formulas ===
+  # State-specific deduction logic that cannot be represented by a single
+  # generic value/method row in the adjustment table.
   calculations_df <- apply_renters_deduction(calculations_df, state_adjustments, calculation_vars)
   calculations_df <- apply_commuter_deduction(calculations_df, state_adjustments, calculation_vars)
-
+  calculations_df <- apply_low_middle_income_exemption(calculations_df, state_adjustments, calculation_vars)
+  calculations_df <- apply_property_tax_deduction(calculations_df, state_adjustments, calculation_vars)
+  
   # === Compute state_cdctc_subtraction (e.g., ID) ===
   if ("cdctc_subtraction_max" %in% names(calculations_df)) {
     calculations_df <- calculations_df %>%
@@ -218,7 +254,7 @@ calculate_state_taxable_income <- function(calculations_df,
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_cdctc_subtraction = 0)
   }
-
+  
   # === Total deductions and taxable income ===
   # Build in a fixed order so deduction components are transparent for review
   total_vars <- c(
@@ -228,7 +264,7 @@ calculate_state_taxable_income <- function(calculations_df,
                                 "dependent_exemption", "state_health_ins_deductible",
                                 "cdctc_subtraction_max"))
   )
-
+  
   for (col in total_vars) {
     if (!col %in% names(calculations_df)) {
       calculations_df <- calculations_df %>%
@@ -238,9 +274,11 @@ calculate_state_taxable_income <- function(calculations_df,
         dplyr::mutate(!!rlang::sym(col) := dplyr::coalesce(.data[[col]], 0))
     }
   }
-
+  
   calculations_df <- calculations_df %>%
     dplyr::mutate(
+      # `state_health_ins_deductible` is treated as a boolean flag:
+      # 1 => include esi_premium_deduction, else exclude it.
       total_state_deductions = standard_deduction +
         personal_exemption +
         dependent_exemption +
@@ -252,7 +290,7 @@ calculate_state_taxable_income <- function(calculations_df,
         )))), na.rm = TRUE),
       state_taxable_income = pmax(starting_income - total_state_deductions, 0)
     )
-
+  
   missing_vars <- setdiff(calculation_vars, names(calculations_df))
   if (length(missing_vars) > 0) {
     warning(glue::glue(
@@ -260,69 +298,16 @@ calculate_state_taxable_income <- function(calculations_df,
       "{paste(missing_vars, collapse = ', ')}"
     ))
   }
-
+  
   if (debug) {
     print(calculations_df %>%
-      dplyr::select(starting_income, dplyr::all_of(total_vars),
-                    total_state_deductions, state_taxable_income) %>%
-      utils::head(10))
+            dplyr::select(starting_income, dplyr::all_of(total_vars),
+                          total_state_deductions, state_taxable_income) %>%
+            utils::head(10))
     print(glue::glue("State taxable income variables: {paste(total_vars, collapse = ', ')}"))
   }
-
+  
   calculations_df
-}
-
-
-# ---------- BRACKET LOOKUP HELPER -----------------------------------
-
-# Match each df row to its income bracket value using findInterval().
-# Tries exact filing_status first; falls back to "all" for unmatched rows.
-# This replaces the per-iteration fuzzyjoin in the generic credit loop.
-#
-# bracket_df must have columns: filing_status, income_min, income_max, value.
-# Returns a numeric vector length n with NA where no bracket matched.
-.bracket_lookup <- function(income, filing_status, bracket_df) {
-  n      <- length(income)
-  result <- rep(NA_real_, n)
-
-  bracket_df <- bracket_df %>%
-    dplyr::mutate(
-      filing_status = dplyr::if_else(
-        is.na(filing_status) | trimws(filing_status) == "", "all",
-        as.character(filing_status)
-      )
-    )
-
-  specific <- bracket_df %>% dplyr::filter(filing_status != "all")
-  all_rows <- bracket_df %>% dplyr::filter(filing_status == "all")
-
-  for (fs in unique(specific$filing_status)) {
-    fs_brk     <- specific %>% dplyr::filter(filing_status == fs) %>% dplyr::arrange(income_min)
-    rows_in_fs <- which(filing_status == fs)
-    if (length(rows_in_fs) == 0L || nrow(fs_brk) == 0L) next
-
-    idx         <- findInterval(income[rows_in_fs], fs_brk$income_min)
-    clipped_idx <- pmax(pmin(idx, nrow(fs_brk)), 1L)
-    in_range    <- idx >= 1L & idx <= nrow(fs_brk) &
-                   income[rows_in_fs] <= fs_brk$income_max[clipped_idx]
-
-    result[rows_in_fs[in_range]] <- as.numeric(fs_brk$value[clipped_idx[in_range]])
-  }
-
-  if (nrow(all_rows) > 0L) {
-    all_brk   <- all_rows %>% dplyr::arrange(income_min)
-    unmatched <- which(is.na(result))
-    if (length(unmatched) > 0L) {
-      idx         <- findInterval(income[unmatched], all_brk$income_min)
-      clipped_idx <- pmax(pmin(idx, nrow(all_brk)), 1L)
-      in_range    <- idx >= 1L & idx <= nrow(all_brk) &
-                     income[unmatched] <= all_brk$income_max[clipped_idx]
-
-      result[unmatched[in_range]] <- as.numeric(all_brk$value[clipped_idx[in_range]])
-    }
-  }
-
-  result
 }
 
 
@@ -370,39 +355,41 @@ calculate_state_tax_credits <- function(calculations_df,
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_filing_status = household_type)
   }
-
+  
   # Remove pre-existing credit columns/totals to avoid carryover across iterations
   calculations_df <- calculations_df %>%
     dplyr::select(
+      # Recompute credit columns each iteration to avoid carryover from previous
+      # starting_income guesses.
       -tidyselect::matches("^credit_"),
       -tidyselect::any_of(c("state_nonrefundable_credits", "state_refundable_credits"))
     )
-
+  
   # 1) Build combined credit table: main sheet + variable_brackets (type == "credit")
   base_credits    <- tax_state_credits_df
   brackets_credit <- tax_state_variable_brackets_df %>%
     dplyr::filter(type == "credit")
-
+  
   if (nrow(brackets_credit) > 0) {
     base_ref <- base_credits %>%
       dplyr::select(variable_name, refundable) %>%
       dplyr::distinct()
-
+    
     brackets_credit <- brackets_credit %>%
       dplyr::left_join(base_ref, by = "variable_name")
-
+    
     vars_with_brackets <- unique(brackets_credit$variable_name)
-
+    
     base_credits <- base_credits %>%
       dplyr::filter(
         !(variable_name %in% vars_with_brackets & is.na(income_min) & is.na(income_max))
       )
-
+    
     state_credits <- dplyr::bind_rows(base_credits, brackets_credit)
   } else {
     state_credits <- base_credits
   }
-
+  
   if (nrow(state_credits) == 0L) {
     if (debug) message("No state credits found for ", state, " in ", year, ".")
     return(
@@ -413,7 +400,7 @@ calculate_state_tax_credits <- function(calculations_df,
         )
     )
   }
-
+  
   state_credits <- state_credits %>%
     dplyr::mutate(
       refundable         = dplyr::coalesce(as.integer(trimws(as.character(refundable))), 0L),
@@ -421,22 +408,51 @@ calculate_state_tax_credits <- function(calculations_df,
       filing_status      = trimws(filing_status),
       variable_name      = trimws(variable_name)
     )
-
-  # Parameter rows used only by special-case handlers; skip in generic loop
-  special_param_vars <- c("early_childhood_pct", "early_childhood_max")
-
+  
+  # Detect "special" credit variables the same way we now detect special TI-adjustment
+  # variables: by counting distinct calculation_method values per variable_name, rather
+  # than relying on a "^special_" naming convention in calculation_method. A variable_name
+  # with more than one method (e.g. multiple parameter rows feeding one formula, like
+  # child_dependent_care's percent_of_fed_cdctc / percent_of_fed_cdctc_estimate /
+  # ny_pre2026_federal_brackets) is treated as special and excluded from the generic loop.
+  
+  method_counts <- state_credits %>%
+    dplyr::filter(!is.na(calculation_method)) %>%
+    dplyr::group_by(variable_name) %>%
+    dplyr::summarise(n_methods = dplyr::n_distinct(calculation_method), .groups = "drop")
+  
+  multi_method_credit_vars <- method_counts %>%
+    dplyr::filter(n_methods > 1) %>%
+    dplyr::pull(variable_name)
+  
+  # Variables consumed only as auxiliary parameters by a dedicated handler (never a
+  # standalone credit column produced by the generic per-filing-status/bracket loop).
+  auxiliary_credit_param_vars <- c(
+    "early_childhood_pct", "early_childhood_max"
+  )
+  
+  # Variables whose calculation is fully delegated to a dedicated apply_*()/calculate_*()
+  # handler further below, even if they currently have only one method row.
+  delegated_credit_vars <- c(
+    "child_dependent_care",
+    "property_tax_credit"
+  )
+  
+  special_credit_vars <- union(
+    multi_method_credit_vars,
+    union(auxiliary_credit_param_vars, delegated_credit_vars)
+  )
+  
   credit_vars <- state_credits %>%
-    dplyr::filter(!grepl("^special_", calculation_method)) %>%
     dplyr::pull(variable_name) %>%
     unique() %>%
-    setdiff(c("dummy", special_param_vars))
-
+    setdiff(c("dummy", special_credit_vars))  
   calculations_df <- calculations_df %>%
     dplyr::mutate(
       state_nonrefundable_credits = 0,
       state_refundable_credits    = 0
     )
-
+  
   # Guard rails: ensure base columns are present and non-NA
   needed_bases <- c("household_size", "children", "child_care_cost",
                     "eitc_credit", "starting_income")
@@ -447,18 +463,18 @@ calculate_state_tax_credits <- function(calculations_df,
       calculations_df[[col]] <- dplyr::coalesce(calculations_df[[col]], 0)
     }
   }
-
+  
   # 2) General credit loop
   for (var in credit_vars) {
     rows   <- state_credits %>% dplyr::filter(variable_name == var)
     method <- unique(rows$calculation_method)
-
+    
     if (length(method) != 1 || is.na(method)) {
       warning(glue::glue("Credit '{var}' has multiple or missing calculation_method entries."))
       next
     }
     method <- method[[1]]
-
+    
     refundable_flag <- unique(rows$refundable)
     if (length(refundable_flag) != 1 || is.na(refundable_flag)) {
       warning(glue::glue(
@@ -468,53 +484,59 @@ calculate_state_tax_credits <- function(calculations_df,
     } else {
       refundable_flag <- as.integer(refundable_flag[[1]])
     }
-
+    
     credit_col <- paste0("credit_", tolower(var))
-
+    
     if (all(is.na(rows$income_min))) {
-      # Case A: flat per-filing-status value
+      # Flat credit value by filing status (before method transformation).
       value_df <- rows %>% dplyr::select(filing_status, value)
-
+      
       tmp <- calculations_df %>%
         dplyr::left_join(value_df, by = c("state_filing_status" = "filing_status"))
-
+      
       tmp[[credit_col]] <- apply_calculation_method(
         value_vector    = tmp$value,
         method          = method,
         calculations_df = calculations_df,
         var_name        = var
       )
-
+      
       calculations_df[[credit_col]] <- dplyr::coalesce(tmp[[credit_col]], 0)
-
+      
     } else {
-      # Case B: income-bracketed value — findInterval() + exact/all fallback
+      # Income-bracketed credit value with filing-status-specific match and "all"
+      # fallback handled by .bracket_lookup().
       matched_values <- .bracket_lookup(
         income        = calculations_df$starting_income,
         filing_status = calculations_df$state_filing_status,
-        bracket_df    = rows
+        bracket_df    = rows,
+        children      = calculations_df$children
       )
-
+      
       credit_values <- apply_calculation_method(
         value_vector    = matched_values,
         method          = method,
         calculations_df = calculations_df,
         var_name        = var
       )
-
+      
       calculations_df[[credit_col]] <- dplyr::coalesce(credit_values, 0)
     }
-
+    
     if (refundable_flag == 1L) {
+      # Refundable credits can drive net state liability below zero.
       calculations_df <- calculations_df %>%
         dplyr::mutate(state_refundable_credits = state_refundable_credits + .data[[credit_col]])
     } else {
+      # Nonrefundable credits are capped later in finalization.
       calculations_df <- calculations_df %>%
         dplyr::mutate(state_nonrefundable_credits = state_nonrefundable_credits + .data[[credit_col]])
     }
   }
-
+  
   # Special-case credit formulas
+  # These handlers add state-specific credits not representable in the generic
+  # loop via a single method/value mapping.
   if ("special_ca_eitc" %in% state_credits$calculation_method) {
     calculations_df <- apply_CA_eitc(
       calculations_df  = calculations_df,
@@ -523,16 +545,16 @@ calculate_state_tax_credits <- function(calculations_df,
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_refundable_credits = state_refundable_credits + credit_ca_eitc)
   }
-
+  
   if ("special_ca_yctc" %in% state_credits$calculation_method) {
     calculations_df <- apply_CA_yctc(
       calculations_df      = calculations_df,
-      tax_state_credits_df = tax_state_credits_df
+      tax_state_credits_df = state_credits
     )
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_refundable_credits = state_refundable_credits + credit_young_child_tax_credit)
   }
-
+  
   if ("special_wa_wftc" %in% state_credits$calculation_method) {
     calculations_df <- apply_state_eitc_style_credit(
       calculations_df  = calculations_df,
@@ -541,10 +563,39 @@ calculate_state_tax_credits <- function(calculations_df,
     calculations_df <- calculations_df %>%
       dplyr::mutate(state_refundable_credits = state_refundable_credits + credit_wftc)
   }
-
+  
+  # Child and Dependent Care Credit (state CDCTC) — delegated regardless of whether
+  # its rows use "special_" method names, since detection is now variable_name-based.
+  if ("child_dependent_care" %in% state_credits$variable_name) {
+    calculations_df <- calculate_state_cdctc_credit(
+      calculations_df      = calculations_df,
+      tax_state_credits_df = state_credits
+    )
+    
+    cdctc_refundable <- unique(
+      state_credits %>%
+        dplyr::filter(variable_name == "child_dependent_care") %>%
+        dplyr::pull(refundable)
+    )
+    
+    if (length(cdctc_refundable) == 1L && cdctc_refundable == 1L) {
+      calculations_df <- calculations_df %>%
+        dplyr::mutate(
+          state_refundable_credits =
+            state_refundable_credits + dplyr::coalesce(state_cdctc_credit, 0)
+        )
+    } else {
+      calculations_df <- calculations_df %>%
+        dplyr::mutate(
+          state_nonrefundable_credits =
+            state_nonrefundable_credits + dplyr::coalesce(state_cdctc_credit, 0)
+        )
+    }
+  }
+  
   # Special-case overrides (IA combined credit cap rule)
   calculations_df <- apply_IA_credit_max_rule(calculations_df, state)
-
+  
   expected_cols <- if (length(credit_vars) == 0L) character(0) else paste0("credit_", tolower(credit_vars))
   missing <- setdiff(expected_cols, names(calculations_df))
   if (length(missing) > 0) {
@@ -553,13 +604,13 @@ calculate_state_tax_credits <- function(calculations_df,
       "{paste(missing, collapse = ', ')}"
     ))
   }
-
+  
   if (debug) {
     keep <- c("starting_income", "state_nonrefundable_credits", "state_refundable_credits",
               grep("^credit_", names(calculations_df), value = TRUE))
     print(calculations_df %>% dplyr::select(dplyr::all_of(keep)) %>% utils::head(10))
   }
-
+  
   calculations_df
 }
 
@@ -580,8 +631,10 @@ calculate_state_tax_credits <- function(calculations_df,
 calculate_final_state_income_tax <- function(calculations_df) {
   calculations_df %>%
     dplyr::mutate(
+      # Nonrefundable credits cannot reduce tax below zero.
       state_nonrefundable_credit_applied = pmin(state_nonrefundable_credits, state_cumulative_tax),
       state_tax_after_nonrefundable      = pmax(state_cumulative_tax - state_nonrefundable_credit_applied, 0),
+      # Refundable credits may produce a negative net liability (refund-like effect).
       state_tax_liability_with_refund    = state_tax_after_nonrefundable - state_refundable_credits,
       final_state_income_tax             = pmax(state_tax_liability_with_refund, 0)
     )

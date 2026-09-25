@@ -2,16 +2,23 @@
 % Please edit documentation in R/validation.R
 \name{validate_input}
 \alias{validate_input}
-\title{Validate Input Dataframe}
+\title{Validate input dataframe and required derived columns}
 \usage{
-validate_input(df)
+validate_input(df, year = NULL, state = NULL, methods_present = NULL)
 }
 \arguments{
-\item{df}{Input dataframe (calculations_df with basic needs)}
+\item{df}{Input calculations dataframe}
+
+\item{year}{Tax year (optional)}
+
+\item{state}{State abbreviation (optional)}
+
+\item{methods_present}{Character vector of calculation_method values found in
+loaded tax parameter tables. If NULL, only base required columns are checked.}
 }
 \value{
-TRUE if valid, stops with error message if invalid
+Invisibly TRUE; errors if required columns are missing.
 }
 \description{
-Checks that the input dataframe has all required columns and valid data
+Validate input dataframe and required derived columns
 }

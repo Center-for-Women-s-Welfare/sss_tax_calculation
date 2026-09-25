@@ -1,0 +1,4 @@
+sss_year,state,state_income_start_point,notes,source,source_url,effective_date,collected_by,date_collected
+2026,CO,federal_taxable_income,Starts from federal taxable income,Colorado Department of Revenue. “Income Tax.” Revised March 2023. Retrieved June 2025 from Colorado Individual Income Tax Guide,https://spl.cde.state.co.us/artemis/revserials/rev919internet/2023.pdf,2025,LMa,5/22/2026
+2026,CA,gross_income,Default SSS modeled income base,NA,NA,NA,NA,NA
+2026,WA,no_income_tax,No broad state income tax,NA,NA,NA,NA,NA
