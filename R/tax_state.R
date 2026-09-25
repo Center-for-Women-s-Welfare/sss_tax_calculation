@@ -125,7 +125,7 @@ calculate_state_payroll_taxes <- function(calculations_df, tax_state_payroll_df,
 #' applied afterward via the special-case helpers in `tax_state_special_cases.R`.
 #'
 #' @param calculations_df Dataframe with starting_income, household_type,
-#'   child_care_cost, health_ins_premium, and any other columns referenced
+#'   child_care_cost, and any other columns referenced
 #'   by state adjustment methods
 #' @param tax_state_adjustments_all_df Dataframe of state TI-adjustment
 #'   parameters already filtered to the target year and state

@@ -29,7 +29,7 @@ The package has one exported entry point, `solve_starting_income_iterative()` in
 1. Validates input via `validate_input()` (`R/validation.R`).
 2. Loads year-specific tax parameter CSVs from `inst/extdata/federal/{year}/` (and, for Phase 2, `inst/extdata/state/{year}/`) via `load_federal_tax_params()` (`R/data_loader.R`) — these are accessed at runtime through `system.file(..., package = "sssTaxCalculation")`, not relative paths, since this is an installed package.
 3. Initializes `starting_income = subtotal3 * 1.20 * 12` and pre-joins per-row EITC lookup parameters (built once via `build_eitc_lookup()`).
-4. Loops up to `max_iterations` times: drops all previous-iteration calculation columns, recomputes payroll tax → income tax → brackets → EITC → CDCTC → CTC → `total_taxes`/`total_credits`, derives `new_starting_income = (subtotal3 * 12) + total_taxes - total_credits`, and checks `abs(new - previous) < tolerance` per row. Rows that converge stop updating their `iteration_count` (each row can converge independently and at a different iteration).
+4. Loops up to `max_iterations` times: drops all previous-iteration calculation columns, recomputes payroll tax → income tax → marketplace PTC (when applicable) → brackets → EITC → CDCTC → CTC → `total_taxes`/`total_credits`, derives `new_starting_income = (subtotal3 * 12) + total_taxes - total_credits`, and checks `abs(new - previous) < tolerance` per row. Rows that converge stop updating their `iteration_count` (each row can converge independently and at a different iteration).
 5. Any rows still unconverged after `max_iterations` fall back to `subtotal3 * 1.20 * 12` and are flagged accordingly; a convergence summary is printed via `print_convergence_summary()` / `print_iteration_progress()` (`R/diagnostics.R`, gated by the `debug` flag).
 6. Applies final credit ordering via `calculate_final_federal_income_tax()` to produce `final_federal_income_tax`.
 
@@ -42,7 +42,19 @@ All federal tax math lives here as composable dataframe-in/dataframe-out functio
 - `build_eitc_lookup()` / `calculate_eitc_credit()` — EITC parameters are expanded into a lookup table keyed by `(eitc_children, household_type)` and left-joined onto the main df once before the loop; `eitc_children = pmin(children, 3)` since federal EITC caps at 3+ children.
 - `extract_cdctc_params()` / `calculate_cdctc_credit()` — CDCTC: non-refundable, capped by `federal_cumulative_tax`, with a sliding rate based on income brackets.
 - `extract_ctc_params()` / `calculate_ctc_credit()` — CTC: splits into non-refundable (limited by post-CDCTC tax liability) and refundable portions, where the refundable calculation differs for 1–2 children (income-based) vs. 3+ children (payroll-tax-based, "additional CTC").
-- `calculate_federal_income_tax()` / `calculate_final_federal_income_tax()` — standard deduction + ESI premium deduction → taxable income, then final liability after applying credits in order: CDCTC (non-refundable) → CTC refundable + EITC (refundable).
+- `calculate_federal_income_tax()` / `calculate_final_federal_income_tax()` — standard deduction + ESI premium deduction → taxable income, then final liability after applying credits in order: CDCTC (non-refundable) → CTC refundable + EITC + marketplace PTC (refundable). ESI deduction is applied only for `health_insurance_scenario == "employer"`.
+- `calculate_premium_tax_credit()` — derives marketplace premium tax credit from household size, income/FPL percentage, and premium-tax-credit brackets; used only for `health_insurance_scenario == "marketplace_ptc"`.
+
+### Health insurance scenario behavior
+
+- Row-level input columns from `sss_production` are supported directly:
+  - `health_insurance_scenario`
+  - `health_insurance_premium_used`
+- Legacy inputs remain supported:
+  - `health_ins_premium`
+  - `health_ins_market`
+- Supported scenario values: `"employer"`, `"marketplace"`, `"marketplace_unsubsidized"`, `"marketplace_ptc"`.
+- Mapping rule: upstream `"marketplace"` defaults to unsubsidized marketplace behavior unless a row is explicitly `"marketplace_ptc"`.
 
 **Reconciliation needed with `sss_production`:** the federal tax functions here may be out of sync with updates made to the federal tax code in `sss_production` since this package was split out. Before considering the state-tax integration complete, reconcile `R/tax_functions.R` and `R/data_loader.R` in this repo against `tax_federal.R` and `tax_functions.R` in `sss_production` — federal logic changes made there post-split may not have been ported back here.
 
