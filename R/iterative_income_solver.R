@@ -7,6 +7,7 @@
 #' (see validate_input for required columns)
 #' @param year Tax year (e.g., 2026)
 #' @param state State abbreviation (reserved for future state tax support)
+#' @param health_insurance_scenario One of "employer", "marketplace_unsubsidized", or "marketplace_ptc" (default: "employer")
 #' @param max_iterations Maximum number of solver iterations (default: 100)
 #' @param tolerance Convergence threshold in dollars (default: 1.0)
 #' @param damping Blending weight applied to the previous estimate on each step (0 = no damping,
@@ -17,6 +18,7 @@
 solve_starting_income_iterative <- function(df,
                                             year,
                                             state = NULL,
+                                            health_insurance_scenario = "employer",
                                             max_iterations = 100,
                                             tolerance = 1.0,
                                             damping = 0.5,
@@ -38,6 +40,34 @@ solve_starting_income_iterative <- function(df,
     state_eitc_lookup <- build_state_eitc_lookup(state_params$state_eitc_lookup)
   }
   
+    valid_health_insurance_scenarios <- c(
+      "employer",
+      "marketplace_unsubsidized",
+      "marketplace_ptc"
+    )
+    
+    if (
+      length(health_insurance_scenario) != 1L ||
+      is.na(health_insurance_scenario) ||
+      !health_insurance_scenario %in% valid_health_insurance_scenarios
+    ) {
+      stop(
+        "health_insurance_scenario must be one of: ",
+        paste(valid_health_insurance_scenarios, collapse = ", "),
+        "."
+      )
+    }
+    
+    use_marketplace_premium <- health_insurance_scenario %in% c(
+      "marketplace_unsubsidized",
+      "marketplace_ptc"
+    )
+    
+    apply_premium_tax_credit <- identical(
+      health_insurance_scenario,
+      "marketplace_ptc"
+    )
+    
   credit_params <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_credits.csv",
                                                package = "sssTaxCalculation"), show_col_types = FALSE) %>%
     dplyr::filter(sss_year == !!year)
@@ -91,8 +121,8 @@ solve_starting_income_iterative <- function(df,
       # This prevents stale values from leaking across iterations.
       dplyr::select(-any_of(c(
         "ss_income", "medicare_threshold", "ss_tax", "medicare_tax", "total_fed_payroll_tax",
-        "fed_sd", "esi_premium_deduction", "total_fed_deductions", "taxable_income",
-        "federal_cumulative_tax",
+        "fed_sd", "health_insurance_premium_used", "esi_premium_deduction", 
+        "total_fed_deductions", "taxable_income", "federal_cumulative_tax",
         "eitc_credit",
         "cdctc_max", "cdctc_eligible_expense", "cdctc_rate", "cdctc_estimate", "cdctc_credit",
         "ctc_credit_base", "federal_tax_after_cdctc", "ctc_nonrefundable",
@@ -109,7 +139,8 @@ solve_starting_income_iterative <- function(df,
       dplyr::select(-dplyr::matches("^payroll_tax_"))
     
     df <- calculate_federal_payroll_taxes(df, federal_payroll, year)
-    df <- calculate_federal_income_tax(df, federal_standard_deduction)
+    df <- calculate_federal_income_tax(df, federal_standard_deduction,
+                                       use_marketplace_premium = use_marketplace_premium),
     df <- calculate_tax_from_brackets(df, federal_tax_brackets,
                                       taxable_income_var = "taxable_income",
                                       filing_status_var  = "filing_status",

@@ -96,6 +96,13 @@ validate_input <- function(df, year = NULL, state = NULL, methods_present = NULL
     
     stop(paste(msg, collapse = "\n"), call. = FALSE)
   }
+  health_premium_cols <- c("health_ins_premium", "health_ins_market")
+  if (!any(health_premium_cols %in% names(df))) {
+      stop(
+        "Missing required health insurance column: provide health_ins_premium ",
+        "or health_ins_market."
+      )
+    }
   # Check for NA values in critical columns
   critical_cols <- c("subtotal2", "subtotal3", "household_type")
   for (col in critical_cols) {

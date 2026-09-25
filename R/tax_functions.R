@@ -408,10 +408,33 @@ calculate_ctc_credit <- function(df, ctc_params_list) {
 
 #' Calculate Federal Income Tax Deductions and Taxable Income
 #'
-#' @param df Dataframe with starting_income, household_type, health_ins_premium
+#' @param df Dataframe with starting_income, household_type, and health-insurance
+#'   premium columns.
 #' @param federal_standard_deduction Dataframe with standard deductions by filing status
+#' @param use_marketplace_premium If TRUE, use `health_ins_market` when present,
+#'   falling back to `health_ins_premium` when the marketplace value is missing.
 #' @return Dataframe with deduction and taxable income columns added
-calculate_federal_income_tax <- function(df, federal_standard_deduction) {
+calculate_federal_income_tax <- function(df, federal_standard_deduction, use_marketplace_premium = FALSE) {
+
+    employer_premium <- if ("health_ins_premium" %in% names(df)) {
+        df$health_ins_premium
+      } else {
+          rep(NA_real_, nrow(df))
+        }
+  
+    marketplace_premium <- if ("health_ins_market" %in% names(df)) {
+          df$health_ins_market
+        } else {
+            rep(NA_real_, nrow(df))
+          }
+    
+    selected_health_premium <- if (use_marketplace_premium) {
+            dplyr::coalesce(marketplace_premium, employer_premium)
+          } else {
+              employer_premium
+            }
+      
+  
   df %>%
     mutate(
       fed_sd = case_when(
@@ -419,7 +442,8 @@ calculate_federal_income_tax <- function(df, federal_standard_deduction) {
         household_type == "single_parent" ~ federal_standard_deduction$single_parent,
         household_type == "single_adult"  ~ federal_standard_deduction$single_adult
       ),
-      esi_premium_deduction = health_ins_premium * 12, # employer-sponsored insurance premiums are annualized
+      health_insurance_premium_used = selected_health_premium,
+      esi_premium_deduction = health_insurance_premium_used * 12, # employer-sponsored insurance premiums are annualized
       total_fed_deductions  = fed_sd + esi_premium_deduction,
       taxable_income        = pmax(starting_income - total_fed_deductions, 0),
       filing_status         = household_type
