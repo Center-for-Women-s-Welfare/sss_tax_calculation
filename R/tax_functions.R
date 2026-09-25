@@ -449,7 +449,7 @@ calculate_federal_income_tax <- function(df,
   scenario_selected_premium <- ifelse(
     row_is_marketplace,
     dplyr::coalesce(upstream_selected_premium, marketplace_premium),
-    dplyr::coalesce(employer_premium, upstream_selected_premium)
+    dplyr::coalesce(upstream_selected_premium, employer_premium)
   )
 
   selected_health_premium <- scenario_selected_premium
