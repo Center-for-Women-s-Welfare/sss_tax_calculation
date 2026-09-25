@@ -426,6 +426,27 @@ test_that("marketplace scenarios use marketplace premium source", {
   expect_equal(out$esi_premium_deduction, 0)
 })
 
+test_that("legacy scenario mode prioritizes legacy premium columns over stale premium_used", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_premium_used <- 999
+  df$health_ins_premium <- 111
+  df$health_ins_market <- 555
+
+  out_market <- solve_starting_income_iterative(
+    df,
+    year = YEAR,
+    health_insurance_scenario = "marketplace_unsubsidized"
+  )
+  out_employer <- solve_starting_income_iterative(
+    df,
+    year = YEAR,
+    health_insurance_scenario = "employer"
+  )
+
+  expect_equal(out_market$health_insurance_premium_used, 555)
+  expect_equal(out_employer$health_insurance_premium_used, 111)
+})
+
 test_that("marketplace scenarios fail clearly when marketplace premium is missing", {
   df <- create_health_scenario_df()[1, ]
   df$health_insurance_scenario <- "marketplace_ptc"

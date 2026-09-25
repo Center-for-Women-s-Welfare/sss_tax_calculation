@@ -443,13 +443,26 @@ calculate_federal_income_tax <- function(df,
   } else {
     rep(default_health_insurance_scenario, nrow(df))
   }
+  scenario_from_input <- if ("health_insurance_scenario_from_input" %in% names(df)) {
+    dplyr::coalesce(df$health_insurance_scenario_from_input, FALSE)
+  } else {
+    rep(FALSE, nrow(df))
+  }
 
   marketplace_scenarios <- c("marketplace", "marketplace_unsubsidized", "marketplace_ptc")
   row_is_marketplace <- row_scenario %in% marketplace_scenarios
   scenario_selected_premium <- ifelse(
     row_is_marketplace,
-    dplyr::coalesce(upstream_selected_premium, marketplace_premium),
-    dplyr::coalesce(upstream_selected_premium, employer_premium)
+    ifelse(
+      scenario_from_input,
+      dplyr::coalesce(upstream_selected_premium, marketplace_premium),
+      dplyr::coalesce(marketplace_premium, upstream_selected_premium)
+    ),
+    ifelse(
+      scenario_from_input,
+      dplyr::coalesce(upstream_selected_premium, employer_premium),
+      dplyr::coalesce(employer_premium, upstream_selected_premium)
+    )
   )
 
   selected_health_premium <- scenario_selected_premium

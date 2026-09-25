@@ -55,9 +55,11 @@ solve_starting_income_iterative <- function(df,
 
   if (!"health_insurance_scenario" %in% names(df)) {
     df$health_insurance_scenario <- health_insurance_scenario
+    df$health_insurance_scenario_from_input <- FALSE
   } else {
     row_scenarios <- trimws(as.character(df$health_insurance_scenario))
     row_scenarios[row_scenarios == ""] <- NA_character_
+    df$health_insurance_scenario_from_input <- !is.na(row_scenarios)
     invalid_row_scenarios <- sort(unique(
       row_scenarios[!is.na(row_scenarios) & !row_scenarios %in% valid_health_insurance_scenarios]
     ))
