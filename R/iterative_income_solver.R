@@ -54,8 +54,7 @@ solve_starting_income_iterative <- function(df,
   }
 
   if (!"health_insurance_scenario" %in% names(df)) {
-    df$health_insurance_scenario <- health_insurance_scenario
-    df$health_insurance_scenario_resolved <- health_insurance_scenario
+    df$health_insurance_scenario_resolved <- rep(health_insurance_scenario, nrow(df))
     df$health_insurance_scenario_from_input <- FALSE
   } else {
     row_scenarios <- trimws(as.character(df$health_insurance_scenario))
