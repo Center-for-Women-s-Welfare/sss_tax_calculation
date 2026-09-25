@@ -446,13 +446,13 @@ calculate_federal_income_tax <- function(df,
 
   marketplace_scenarios <- c("marketplace", "marketplace_unsubsidized", "marketplace_ptc")
   row_is_marketplace <- row_scenario %in% marketplace_scenarios
-  legacy_selected_premium <- ifelse(
+  scenario_selected_premium <- ifelse(
     row_is_marketplace,
-    marketplace_premium,
-    employer_premium
+    dplyr::coalesce(upstream_selected_premium, marketplace_premium),
+    dplyr::coalesce(employer_premium, upstream_selected_premium)
   )
 
-  selected_health_premium <- dplyr::coalesce(upstream_selected_premium, legacy_selected_premium)
+  selected_health_premium <- scenario_selected_premium
   esi_premium_deduction <- ifelse(row_scenario == "employer", selected_health_premium * 12, 0)
 
   df %>%
