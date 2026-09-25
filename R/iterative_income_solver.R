@@ -114,6 +114,19 @@ solve_starting_income_iterative <- function(df,
     )
   }
 
+  if ("health_insurance_premium_used" %in% names(df) && "health_ins_premium" %in% names(df)) {
+    conflicting_employer_rows <- employer_rows &
+      !is.na(df$health_insurance_premium_used) &
+      !is.na(df$health_ins_premium) &
+      (df$health_insurance_premium_used != df$health_ins_premium)
+    if (any(conflicting_employer_rows)) {
+      stop(
+        "Employer scenario rows have conflicting health_insurance_premium_used and health_ins_premium values. ",
+        "Invalid rows: ", sum(conflicting_employer_rows), "."
+      )
+    }
+  }
+
   if (!is.null(state)) {
     # Load all state-specific parameter tables once, outside the iteration loop.
     # This avoids repeated disk reads and keeps each iteration focused on recomputation
@@ -203,28 +216,31 @@ solve_starting_income_iterative <- function(df,
       default_health_insurance_scenario = health_insurance_scenario
     )
     if (any(df$apply_premium_tax_credit)) {
-      df <- df %>%
-        dplyr::mutate(row_id = dplyr::row_number())
-      ptc_rows <- df %>%
-        dplyr::filter(.data$apply_premium_tax_credit) %>%
+      df$fpl <- NA_real_
+      df$pct_fpl <- NA_real_
+      df$required_income_rate <- NA_real_
+      df$monthly_premium_selected <- NA_real_
+      df$annual_selected_premium <- NA_real_
+      df$annual_required_contribution <- NA_real_
+      df$premium_tax_credit_raw <- NA_real_
+      df$premium_tax_credit <- 0
+
+      ptc_idx <- which(df$apply_premium_tax_credit)
+      ptc_rows <- df[ptc_idx, , drop = FALSE] %>%
         calculate_premium_tax_credit(
           fed_poverty_line = fed_poverty_line,
           fed_premium_tax_credit = fed_premium_tax_credit,
           effective_year = year,
           premium_col = "health_insurance_premium_used"
-        ) %>%
-        dplyr::select(
-          row_id, fpl, pct_fpl, required_income_rate,
-          monthly_premium_selected, annual_selected_premium,
-          annual_required_contribution, premium_tax_credit_raw,
-          premium_tax_credit
         )
-      df <- df %>%
-        dplyr::left_join(ptc_rows, by = "row_id", relationship = "one-to-one") %>%
-        dplyr::mutate(
-          premium_tax_credit = dplyr::coalesce(.data$premium_tax_credit, 0)
-        ) %>%
-        dplyr::select(-.data$row_id)
+      df$fpl[ptc_idx] <- ptc_rows$fpl
+      df$pct_fpl[ptc_idx] <- ptc_rows$pct_fpl
+      df$required_income_rate[ptc_idx] <- ptc_rows$required_income_rate
+      df$monthly_premium_selected[ptc_idx] <- ptc_rows$monthly_premium_selected
+      df$annual_selected_premium[ptc_idx] <- ptc_rows$annual_selected_premium
+      df$annual_required_contribution[ptc_idx] <- ptc_rows$annual_required_contribution
+      df$premium_tax_credit_raw[ptc_idx] <- ptc_rows$premium_tax_credit_raw
+      df$premium_tax_credit[ptc_idx] <- dplyr::coalesce(ptc_rows$premium_tax_credit, 0)
     } else {
       df$premium_tax_credit <- 0
       df$fpl <- NA_real_

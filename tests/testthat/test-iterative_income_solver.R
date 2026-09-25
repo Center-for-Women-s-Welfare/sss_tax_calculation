@@ -403,6 +403,18 @@ test_that("premium tax credit applies only to marketplace_ptc and affects result
   expect_true(out_ptc$starting_income < out_unsub$starting_income)
 })
 
+test_that("row-level marketplace maps to unsubsidized while marketplace_ptc gets PTC", {
+  df <- create_health_scenario_df()
+  df$health_insurance_scenario <- c("marketplace", "marketplace_ptc")
+  df$health_ins_market <- c(650, 650)
+  df$health_ins_premium <- c(200, 200)
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_equal(out$premium_tax_credit[1], 0)
+  expect_true(out$premium_tax_credit[2] > 0)
+  expect_true(out$starting_income[2] < out$starting_income[1])
+})
+
 test_that("marketplace scenarios use marketplace premium source", {
   df <- create_health_scenario_df()[1, ]
   df$health_insurance_scenario <- "marketplace_unsubsidized"
