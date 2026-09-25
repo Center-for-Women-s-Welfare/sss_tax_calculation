@@ -55,11 +55,13 @@ solve_starting_income_iterative <- function(df,
 
   if (!"health_insurance_scenario" %in% names(df)) {
     df$health_insurance_scenario <- health_insurance_scenario
+    df$health_insurance_scenario_resolved <- health_insurance_scenario
     df$health_insurance_scenario_from_input <- FALSE
   } else {
     row_scenarios <- trimws(as.character(df$health_insurance_scenario))
     row_scenarios[row_scenarios == ""] <- NA_character_
     df$health_insurance_scenario_from_input <- !is.na(row_scenarios)
+    df$health_insurance_scenario_resolved <- dplyr::coalesce(row_scenarios, health_insurance_scenario)
     invalid_row_scenarios <- sort(unique(
       row_scenarios[!is.na(row_scenarios) & !row_scenarios %in% valid_health_insurance_scenarios]
     ))
@@ -72,13 +74,12 @@ solve_starting_income_iterative <- function(df,
         "."
       )
     }
-    df$health_insurance_scenario <- dplyr::coalesce(row_scenarios, health_insurance_scenario)
   }
 
   # Upstream `marketplace` does not distinguish subsidized vs unsubsidized rows.
   # Use unsubsidized behavior by default and apply PTC only when explicitly tagged
   # as `marketplace_ptc`.
-  df$apply_premium_tax_credit <- df$health_insurance_scenario == "marketplace_ptc"
+  df$apply_premium_tax_credit <- df$health_insurance_scenario_resolved == "marketplace_ptc"
 
   premium_used_col <- if ("health_insurance_premium_used" %in% names(df)) {
     !is.na(df$health_insurance_premium_used)
@@ -97,8 +98,8 @@ solve_starting_income_iterative <- function(df,
   }
 
   marketplace_scenarios <- c("marketplace", "marketplace_unsubsidized", "marketplace_ptc")
-  marketplace_rows <- df$health_insurance_scenario %in% marketplace_scenarios
-  employer_rows <- df$health_insurance_scenario == "employer"
+  marketplace_rows <- df$health_insurance_scenario_resolved %in% marketplace_scenarios
+  employer_rows <- df$health_insurance_scenario_resolved == "employer"
 
   invalid_marketplace_rows <- marketplace_rows & !(premium_used_col | marketplace_premium_col)
   if (any(invalid_marketplace_rows)) {
@@ -361,5 +362,6 @@ solve_starting_income_iterative <- function(df,
 
   df %>%
     dplyr::select(-any_of(c("previous_income", "new_starting_income",
-                            "income_diff", "row_converged")))
+                            "income_diff", "row_converged",
+                            "health_insurance_scenario_resolved")))
 }

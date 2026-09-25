@@ -438,7 +438,9 @@ calculate_federal_income_tax <- function(df,
     rep(NA_real_, nrow(df))
   }
 
-  row_scenario <- if ("health_insurance_scenario" %in% names(df)) {
+  row_scenario <- if ("health_insurance_scenario_resolved" %in% names(df)) {
+    dplyr::coalesce(df$health_insurance_scenario_resolved, default_health_insurance_scenario)
+  } else if ("health_insurance_scenario" %in% names(df)) {
     dplyr::coalesce(df$health_insurance_scenario, default_health_insurance_scenario)
   } else {
     rep(default_health_insurance_scenario, nrow(df))
@@ -464,6 +466,7 @@ calculate_federal_income_tax <- function(df,
       dplyr::coalesce(employer_premium, upstream_selected_premium)
     )
   )
+  scenario_selected_premium <- dplyr::coalesce(scenario_selected_premium, 0)
 
   selected_health_premium <- scenario_selected_premium
   esi_premium_deduction <- ifelse(row_scenario == "employer", selected_health_premium * 12, 0)

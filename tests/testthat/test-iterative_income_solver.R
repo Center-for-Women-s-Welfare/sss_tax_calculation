@@ -415,6 +415,16 @@ test_that("row-level marketplace maps to unsubsidized while marketplace_ptc gets
   expect_true(out$starting_income[2] < out$starting_income[1])
 })
 
+test_that("existing health_insurance_scenario column type is preserved", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- factor("marketplace")
+  df$health_insurance_premium_used <- 500
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_true(is.factor(out$health_insurance_scenario))
+  expect_equal(as.character(out$health_insurance_scenario), "marketplace")
+})
+
 test_that("marketplace scenarios use marketplace premium source", {
   df <- create_health_scenario_df()[1, ]
   df$health_insurance_scenario <- "marketplace_unsubsidized"
