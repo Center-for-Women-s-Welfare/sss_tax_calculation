@@ -114,19 +114,6 @@ solve_starting_income_iterative <- function(df,
     )
   }
 
-  if ("health_insurance_premium_used" %in% names(df) && "health_ins_premium" %in% names(df)) {
-    conflicting_employer_rows <- employer_rows &
-      !is.na(df$health_insurance_premium_used) &
-      !is.na(df$health_ins_premium) &
-      (df$health_insurance_premium_used != df$health_ins_premium)
-    if (any(conflicting_employer_rows)) {
-      stop(
-        "Employer scenario rows have conflicting health_insurance_premium_used and health_ins_premium values. ",
-        "Invalid rows: ", sum(conflicting_employer_rows), "."
-      )
-    }
-  }
-
   if (!is.null(state)) {
     # Load all state-specific parameter tables once, outside the iteration loop.
     # This avoids repeated disk reads and keeps each iteration focused on recomputation
@@ -326,8 +313,7 @@ solve_starting_income_iterative <- function(df,
           pmax(federal_net, 0) +
           pmax(state_net, 0),
         total_credits = pmax(-federal_net, 0) +
-          pmax(-state_net, 0) +
-          coalesce(premium_tax_credit, 0)
+          pmax(-state_net, 0)
       )
 
     raw_new_income         <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
