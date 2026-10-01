@@ -315,7 +315,8 @@ solve_starting_income_iterative <- function(df,
           pmax(federal_net, 0) +
           pmax(state_net, 0),
         total_credits = pmax(-federal_net, 0) +
-          pmax(-state_net, 0)
+          pmax(-state_net, 0) +
+          dplyr::coalesce(premium_tax_credit, 0)
       )
 
     raw_new_income         <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
