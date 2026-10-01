@@ -106,7 +106,7 @@ calculate_premium_tax_credit <- function(calculations_df,
   fpl_lookup <- fed_poverty_line %>%
     dplyr::filter(
       .data$fpl_year == fpl_year_value,
-      .data$fpl_area == fpl_area
+      .data$fpl_area == .env$fpl_area
     ) %>%
     dplyr::select(.data$hh_size, .data$fpl)
 
