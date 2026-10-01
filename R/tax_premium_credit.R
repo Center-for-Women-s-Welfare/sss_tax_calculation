@@ -105,24 +105,14 @@ calculate_premium_tax_credit <- function(calculations_df,
 
   fpl_lookup <- fed_poverty_line %>%
     dplyr::filter(
-      .data$fpl_year == fpl_year_value,
+      .data$fpl_year == .env$fpl_year_value,
       .data$fpl_area == .env$fpl_area
     ) %>%
-    dplyr::select(.data$hh_size, .data$fpl)
-
-  if (nrow(fpl_lookup) == 0) {
-    stop(
-      "No federal poverty-line data found for fpl_year = ",
-      fpl_year_value,
-      " and fpl_area = ",
-      fpl_area,
-      "."
-    )
-  }
-
+    dplyr::transmute(hh_size = as.integer(.data$hh_size), fpl_value = .data$fpl)
+  
   calculations_df <- calculations_df %>%
     dplyr::mutate(
-      fpl_household_size = pmin(.data$household_size, max(fpl_lookup$hh_size))
+      fpl_household_size = as.integer(pmin(.data$household_size, max(fpl_lookup$hh_size)))
     ) %>%
     dplyr::left_join(
       fpl_lookup,
@@ -130,10 +120,11 @@ calculate_premium_tax_credit <- function(calculations_df,
       relationship = "many-to-one"
     ) %>%
     dplyr::mutate(
+      fpl = .data$fpl_value,
       pct_fpl = (.data$starting_income / .data$fpl) * 100
     ) %>%
-    dplyr::select(-.data$fpl_household_size)
-
+    dplyr::select(-.data$fpl_household_size, -.data$fpl_value)
+  
   # ---- Step 2: required income rate from the PTC bracket schedule ------
   ptc_schedule <- fed_premium_tax_credit %>%
     dplyr::filter(.data$effective_year == !!effective_year) %>%
