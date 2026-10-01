@@ -315,3 +315,269 @@ test_that("single-row input converges and returns one row", {
   expect_equal(nrow(out), 1)
   expect_true(out$converged)
 })
+
+create_health_scenario_df <- function() {
+  data.frame(
+    subtotal2 = c(2500, 2500),
+    subtotal3 = c(2600, 2600),
+    household_type = c("single_adult", "single_adult"),
+    children = c(0L, 0L),
+    adult = c(1L, 1L),
+    household_size = c(1L, 1L),
+    child_care_cost = c(0, 0),
+    county_table_number = c("1909599999_1", "1909599999_1"),
+    tax_rate_local = c(0, 0),
+    health_ins_premium = c(200, 200),
+    health_ins_market = c(450, 450),
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("legacy input with only health_ins_premium still works", {
+  df <- dplyr::select(create_health_scenario_df(), -health_ins_market)
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_true(all(out$converged))
+  expect_true(all(out$health_insurance_premium_used == df$health_ins_premium))
+})
+
+test_that("upstream employer row preserves scenario and selected premium", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- "employer"
+  df$health_insurance_premium_used <- 321
+
+  out <- solve_starting_income_iterative(df, year = YEAR, health_insurance_scenario = "marketplace_ptc")
+  expect_equal(out$health_insurance_scenario, "employer")
+  expect_equal(out$health_insurance_premium_used, 321)
+  expect_equal(out$esi_premium_deduction, 321 * 12)
+})
+
+test_that("upstream marketplace row preserves scenario and selected premium", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- "marketplace"
+  df$health_insurance_premium_used <- 432
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_equal(out$health_insurance_scenario, "marketplace")
+  expect_equal(out$health_insurance_premium_used, 432)
+  expect_equal(out$esi_premium_deduction, 0)
+})
+
+test_that("employer and marketplace rows are solved independently and keep scenario labels", {
+  df <- create_health_scenario_df()
+  df$health_insurance_scenario <- c("employer", "marketplace")
+  df$health_insurance_premium_used <- c(200, 450)
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_equal(out$health_insurance_scenario, c("employer", "marketplace"))
+  expect_true(out$starting_income[2] != out$starting_income[1])
+})
+
+test_that("marketplace_unsubsidized and marketplace_ptc modes validate and run", {
+  df <- create_health_scenario_df()[1, ]
+  expect_no_error(
+    solve_starting_income_iterative(df, year = YEAR, health_insurance_scenario = "marketplace_unsubsidized")
+  )
+  expect_no_error(
+    solve_starting_income_iterative(df, year = YEAR, health_insurance_scenario = "marketplace_ptc")
+  )
+})
+
+test_that("premium tax credit applies only to marketplace_ptc and affects results", {
+  base_df <- create_health_scenario_df()[1, ]
+  base_df <- dplyr::select(base_df, -health_ins_premium)
+  base_df <- dplyr::mutate(base_df, health_ins_market = 600)
+
+  out_unsub <- solve_starting_income_iterative(
+    base_df,
+    year = YEAR,
+    health_insurance_scenario = "marketplace_unsubsidized"
+  )
+  out_ptc <- solve_starting_income_iterative(
+    base_df,
+    year = YEAR,
+    health_insurance_scenario = "marketplace_ptc"
+  )
+
+  expect_equal(out_unsub$premium_tax_credit, 0)
+  expect_true(out_ptc$premium_tax_credit > 0)
+  expect_true(out_ptc$starting_income < out_unsub$starting_income)
+})
+
+test_that("row-level marketplace maps to unsubsidized while marketplace_ptc gets PTC", {
+  df <- create_health_scenario_df()
+  df$health_insurance_scenario <- c("marketplace", "marketplace_ptc")
+  df$health_ins_market <- c(650, 650)
+  df$health_ins_premium <- c(200, 200)
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_equal(out$premium_tax_credit[1], 0)
+  expect_true(out$premium_tax_credit[2] > 0)
+  expect_true(out$starting_income[2] < out$starting_income[1])
+})
+
+test_that("refundable marketplace PTC is reflected in solver credit totals", {
+  df <- create_health_scenario_df()[1, ]
+  df$subtotal2 <- 1800
+  df$subtotal3 <- 1850
+  df$health_insurance_scenario <- "marketplace_ptc"
+  df$health_ins_market <- 700
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_true(out$premium_tax_credit > 0)
+  expect_true(out$total_credits >= out$premium_tax_credit)
+})
+
+test_that("existing health_insurance_scenario column type is preserved", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- factor("marketplace")
+  df$health_insurance_premium_used <- 500
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_true(is.factor(out$health_insurance_scenario))
+  expect_equal(as.character(out$health_insurance_scenario), "marketplace")
+  expect_equal(out$health_insurance_premium_used, 500)
+  expect_equal(out$esi_premium_deduction, 0)
+})
+
+test_that("marketplace scenarios use marketplace premium source", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- "marketplace_unsubsidized"
+  df$health_ins_premium <- 111
+  df$health_ins_market <- 555
+
+  out <- solve_starting_income_iterative(df, year = YEAR)
+  expect_equal(out$health_insurance_premium_used, 555)
+  expect_equal(out$esi_premium_deduction, 0)
+})
+
+test_that("legacy scenario mode prioritizes legacy premium columns over stale premium_used", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_premium_used <- 999
+  df$health_ins_premium <- 111
+  df$health_ins_market <- 555
+
+  out_market <- solve_starting_income_iterative(
+    df,
+    year = YEAR,
+    health_insurance_scenario = "marketplace_unsubsidized"
+  )
+  out_employer <- solve_starting_income_iterative(
+    df,
+    year = YEAR,
+    health_insurance_scenario = "employer"
+  )
+
+  expect_equal(out_market$health_insurance_premium_used, 555)
+  expect_equal(out_employer$health_insurance_premium_used, 111)
+})
+
+test_that("marketplace scenarios fail clearly when marketplace premium is missing", {
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- "marketplace_ptc"
+  df$health_ins_market <- NA_real_
+  df$health_insurance_premium_used <- NA_real_
+
+  expect_error(
+    solve_starting_income_iterative(df, year = YEAR),
+    "Marketplace scenario rows require health_insurance_premium_used or health_ins_market"
+  )
+})
+
+test_that("premium tax credit is recomputed as starting income changes", {
+  df <- create_health_scenario_df()[1, ]
+  df <- dplyr::select(df, -health_ins_premium)
+  df <- dplyr::mutate(df, health_ins_market = 700)
+
+  out_short <- withCallingHandlers(
+    solve_starting_income_iterative(
+      df,
+      year = YEAR,
+      health_insurance_scenario = "marketplace_ptc",
+      max_iterations = 1
+    ),
+    warning = function(w) invokeRestart("muffleWarning")
+  )
+  out_long <- solve_starting_income_iterative(
+    df,
+    year = YEAR,
+    health_insurance_scenario = "marketplace_ptc",
+    max_iterations = 20
+  )
+
+  expect_true(is.finite(out_short$premium_tax_credit))
+  expect_true(is.finite(out_long$premium_tax_credit))
+  expect_true(abs(out_short$premium_tax_credit - out_long$premium_tax_credit) > 0.01)
+})
+
+test_that("premium tax credit does not over-credit unmatched required-income rows", {
+  calculations_df <- data.frame(
+    household_size = 1L,
+    starting_income = 100000,
+    health_insurance_premium_used = 600,
+    stringsAsFactors = FALSE
+  )
+  fed_poverty_line <- data.frame(
+    fpl_year = 2025,
+    fpl_area = "FORTY_EIGHT_DC",
+    hh_size = 1L,
+    fpl = 15060
+  )
+  fed_premium_tax_credit <- data.frame(
+    effective_year = 2026,
+    income_pct_fpl_min = 0,
+    income_pct_fpl_max = 200,
+    required_income_rate_min = 0,
+    required_income_rate_max = 0.02
+  )
+
+  out <- calculate_premium_tax_credit(
+    calculations_df = calculations_df,
+    fed_poverty_line = fed_poverty_line,
+    fed_premium_tax_credit = fed_premium_tax_credit,
+    effective_year = 2026
+  )
+
+  expect_true(is.na(out$required_income_rate))
+  expect_equal(out$premium_tax_credit, 0)
+})
+
+test_that("solver sets premium_tax_credit to zero when PTC schedule does not match", {
+  base_params <- load_federal_tax_params(YEAR)
+  base_params$fed_premium_tax_credit <- data.frame(
+    effective_year = YEAR,
+    income_pct_fpl_min = 0,
+    income_pct_fpl_max = 200,
+    required_income_rate_min = 0,
+    required_income_rate_max = 0.02
+  )
+
+  df <- create_health_scenario_df()[1, ]
+  df$health_insurance_scenario <- "marketplace_ptc"
+  df$health_ins_market <- 700
+
+  out <- testthat::with_mocked_bindings(
+    solve_starting_income_iterative(df, year = YEAR),
+    load_federal_tax_params = function(year) base_params
+  )
+
+  expect_equal(out$premium_tax_credit, 0)
+  expect_true(is.finite(out$starting_income))
+})
+
+test_that("invalid health insurance scenario names fail clearly", {
+  df <- create_health_scenario_df()[1, ]
+  expect_error(
+    solve_starting_income_iterative(df, year = YEAR, health_insurance_scenario = "invalid"),
+    "health_insurance_scenario must be one of"
+  )
+})
+
+test_that("solver accepts inputs with only health_insurance_premium_used", {
+  df <- create_health_scenario_df()[1, ]
+  df <- dplyr::select(df, -health_ins_premium, -health_ins_market)
+  df <- dplyr::mutate(df, health_insurance_premium_used = 375)
+
+  out <- solve_starting_income_iterative(df, year = YEAR, health_insurance_scenario = "employer")
+  expect_equal(out$health_insurance_premium_used, 375)
+  expect_true(out$converged)
+})

@@ -84,6 +84,7 @@ solve_starting_income_iterative(
   df,                    # Required: Dataframe with basic needs data
   year,                  # Required: Tax year (e.g., 2026)
   state = NULL,          # Optional: State code (for Phase 2)
+  health_insurance_scenario = "employer", # Optional default when row-level scenario is absent
   max_iterations = 100,  # Optional: Max iterations before fallback
   tolerance = 1.0,       # Optional: Convergence tolerance in dollars
   debug = FALSE          # Optional: Enable detailed output
@@ -91,9 +92,38 @@ solve_starting_income_iterative(
 ```
 
 **Key Changes from Original Design:**
-- Tax parameters are **loaded automatically** from `data/federal/{year}/` CSV files
+- Tax parameters are **loaded automatically** from `inst/extdata/federal/{year}/` CSV files
 - No need to pass `tax_params` parameter
 - Simpler function signature
+
+### Health insurance scenario compatibility
+
+The solver supports both upstream row-level columns from `sss_production` and legacy columns:
+
+- Row-level upstream fields:
+  - `health_insurance_scenario` (`"employer"` or `"marketplace"` upstream)
+  - `health_insurance_premium_used` (monthly premium selected upstream)
+- Legacy fields:
+  - `health_ins_premium` (employer premium)
+  - `health_ins_market` (marketplace premium)
+
+Supported scenario values and mappings:
+
+- `"employer"`: employer-sponsored plan (eligible for ESI deduction)
+- `"marketplace"`: upstream marketplace scenario; treated as `"marketplace_unsubsidized"` by default
+- `"marketplace_unsubsidized"`: marketplace premium with no PTC
+- `"marketplace_ptc"`: marketplace premium with premium tax credit (PTC)
+
+If `health_insurance_scenario` is present in the input row, it is used as the source of truth.
+If absent, the solver argument `health_insurance_scenario` is used for backward compatibility.
+When row-level scenarios are supplied, `health_insurance_premium_used` is preferred whenever present.
+When scenarios are supplied only through the solver argument (legacy mode), scenario-specific legacy columns are preferred and `health_insurance_premium_used` is treated as fallback.
+Marketplace scenarios require marketplace-compatible premiums (`health_insurance_premium_used` or `health_ins_market`).
+
+ESI deduction policy: only rows with employer coverage receive the federal ESI premium deduction.
+Marketplace rows do not receive the ESI deduction.
+
+Premium tax credit policy: PTC is applied only for `"marketplace_ptc"` rows and recomputed each solver iteration from current income and premium.
 
 ## Input Requirements
 
@@ -354,7 +384,7 @@ This will print:
 Tax parameters are stored in CSV files organized by year:
 
 ```
-src/data/federal/2026/
+inst/extdata/federal/2026/
 ├── tax_fed_credits_df.csv       # EITC, CDCTC, CTC parameters
 ├── tax_fed_income_brackets_df.csv  # Federal tax brackets
 ├── tax_fed_payroll_df.csv       # Social Security, Medicare rates
@@ -365,7 +395,7 @@ src/data/federal/2026/
 
 Tax laws change annually. To update for a new year:
 
-1. Create new directory: `src/data/federal/{year}/`
+1. Create new directory: `inst/extdata/federal/{year}/`
 2. Populate with updated CSV files following existing schema
 3. Update tests with new expected values
 4. Run validation suite

@@ -22,7 +22,7 @@ validate_input <- function(df, year = NULL, state = NULL, methods_present = NULL
     # Family info
     "household_type", "children", "adult",
     # Costs
-    "child_care_cost", "health_ins_premium",
+    "child_care_cost",
     # Geography
     "county_table_number",
     # Local income tax rate/fee/surtax
@@ -96,11 +96,15 @@ validate_input <- function(df, year = NULL, state = NULL, methods_present = NULL
     
     stop(paste(msg, collapse = "\n"), call. = FALSE)
   }
-  health_premium_cols <- c("health_ins_premium", "health_ins_market")
+  health_premium_cols <- c(
+    "health_ins_premium",
+    "health_ins_market",
+    "health_insurance_premium_used"
+  )
   if (!any(health_premium_cols %in% names(df))) {
       stop(
-        "Missing required health insurance column: provide health_ins_premium ",
-        "or health_ins_market."
+        "Missing required health insurance column: provide health_insurance_premium_used, ",
+        "health_ins_premium, or health_ins_market."
       )
     }
   # Check for NA values in critical columns

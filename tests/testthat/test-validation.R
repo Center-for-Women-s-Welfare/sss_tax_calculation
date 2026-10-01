@@ -210,3 +210,10 @@ test_that("Original dataframe is preserved after validation", {
   validate_input(df_copy)
   expect_equal(df_original, df_copy)
 })
+
+test_that("validate_input accepts rows with only health_insurance_premium_used", {
+  mock_df <- create_mock_df()
+  mock_df$health_ins_premium <- NULL
+  mock_df$health_insurance_premium_used <- runif(nrow(mock_df), min = 0, max = 2000)
+  expect_true(validate_input(mock_df))
+})

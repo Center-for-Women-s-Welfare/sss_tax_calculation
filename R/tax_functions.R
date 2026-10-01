@@ -411,30 +411,66 @@ calculate_ctc_credit <- function(df, ctc_params_list) {
 #' @param df Dataframe with starting_income, household_type, and health-insurance
 #'   premium columns.
 #' @param federal_standard_deduction Dataframe with standard deductions by filing status
-#' @param use_marketplace_premium If TRUE, use `health_ins_market` when present,
-#'   falling back to `health_ins_premium` when the marketplace value is missing.
+#' @param default_health_insurance_scenario Scenario applied when a row does not
+#'   already provide `health_insurance_scenario`. Must be one of
+#'   `"employer"`, `"marketplace"`, `"marketplace_unsubsidized"`,
+#'   or `"marketplace_ptc"`.
 #' @return Dataframe with deduction and taxable income columns added
-calculate_federal_income_tax <- function(df, federal_standard_deduction, use_marketplace_premium = FALSE) {
+calculate_federal_income_tax <- function(df,
+                                         federal_standard_deduction,
+                                         default_health_insurance_scenario = "employer") {
 
-    employer_premium <- if ("health_ins_premium" %in% names(df)) {
-        df$health_ins_premium
-      } else {
-          rep(NA_real_, nrow(df))
-        }
-  
-    marketplace_premium <- if ("health_ins_market" %in% names(df)) {
-          df$health_ins_market
-        } else {
-            rep(NA_real_, nrow(df))
-          }
-    
-    selected_health_premium <- if (use_marketplace_premium) {
-            dplyr::coalesce(marketplace_premium, employer_premium)
-          } else {
-              employer_premium
-            }
-      
-  
+  employer_premium <- if ("health_ins_premium" %in% names(df)) {
+    df$health_ins_premium
+  } else {
+    rep(NA_real_, nrow(df))
+  }
+
+  marketplace_premium <- if ("health_ins_market" %in% names(df)) {
+    df$health_ins_market
+  } else {
+    rep(NA_real_, nrow(df))
+  }
+
+  upstream_selected_premium <- if ("health_insurance_premium_used" %in% names(df)) {
+    df$health_insurance_premium_used
+  } else {
+    rep(NA_real_, nrow(df))
+  }
+
+  row_scenario <- if ("health_insurance_scenario_resolved" %in% names(df)) {
+    dplyr::coalesce(as.character(df$health_insurance_scenario_resolved), default_health_insurance_scenario)
+  } else if ("health_insurance_scenario" %in% names(df)) {
+    dplyr::coalesce(as.character(df$health_insurance_scenario), default_health_insurance_scenario)
+  } else {
+    rep(default_health_insurance_scenario, nrow(df))
+  }
+  scenario_from_input <- if ("health_insurance_scenario_from_input" %in% names(df)) {
+    dplyr::coalesce(df$health_insurance_scenario_from_input, FALSE)
+  } else {
+    rep(FALSE, nrow(df))
+  }
+
+  marketplace_scenarios <- c("marketplace", "marketplace_unsubsidized", "marketplace_ptc")
+  row_is_marketplace <- row_scenario %in% marketplace_scenarios
+  scenario_selected_premium <- ifelse(
+    row_is_marketplace,
+    ifelse(
+      scenario_from_input,
+      dplyr::coalesce(upstream_selected_premium, marketplace_premium),
+      dplyr::coalesce(marketplace_premium, upstream_selected_premium)
+    ),
+    ifelse(
+      scenario_from_input,
+      dplyr::coalesce(upstream_selected_premium, employer_premium),
+      dplyr::coalesce(employer_premium, upstream_selected_premium)
+    )
+  )
+  scenario_selected_premium <- dplyr::coalesce(scenario_selected_premium, 0)
+
+  selected_health_premium <- scenario_selected_premium
+  esi_premium_deduction <- ifelse(row_scenario == "employer", selected_health_premium * 12, 0)
+
   df %>%
     mutate(
       fed_sd = case_when(
@@ -443,7 +479,7 @@ calculate_federal_income_tax <- function(df, federal_standard_deduction, use_mar
         household_type == "single_adult"  ~ federal_standard_deduction$single_adult
       ),
       health_insurance_premium_used = selected_health_premium,
-      esi_premium_deduction = health_insurance_premium_used * 12, # employer-sponsored insurance premiums are annualized
+      esi_premium_deduction = esi_premium_deduction,
       total_fed_deductions  = fed_sd + esi_premium_deduction,
       taxable_income        = pmax(starting_income - total_fed_deductions, 0),
       filing_status         = household_type
@@ -457,7 +493,7 @@ calculate_federal_income_tax <- function(df, federal_standard_deduction, use_mar
 #' tax, (3) refundable credits (CTC refundable + EITC) against remaining liability.
 #'
 #' @param df Dataframe with federal_cumulative_tax, cdctc_credit, ctc_nonrefundable,
-#'   ctc_refundable, eitc_credit
+#'   ctc_refundable, eitc_credit, and optional premium_tax_credit
 #' @return Dataframe with final federal income tax calculation columns added:
 #'   fed_cdctc_applied, federal_tax_after_cdctc, fed_ctc_nonrefundable_applied,
 #'   federal_tax_after_nonrefundable, federal_total_refundable_credits,
@@ -469,7 +505,7 @@ calculate_final_federal_income_tax <- function(df) {
       federal_tax_after_cdctc           = pmax(federal_cumulative_tax - fed_cdctc_applied, 0),
       fed_ctc_nonrefundable_applied     = pmin(ctc_nonrefundable, federal_tax_after_cdctc),
       federal_tax_after_nonrefundable   = pmax(federal_tax_after_cdctc - fed_ctc_nonrefundable_applied, 0),
-      federal_total_refundable_credits  = ctc_refundable + eitc_credit,
+      federal_total_refundable_credits  = ctc_refundable + eitc_credit + dplyr::coalesce(premium_tax_credit, 0),
       federal_tax_liability_with_refund = federal_tax_after_nonrefundable - federal_total_refundable_credits,
       final_federal_income_tax          = pmax(federal_tax_liability_with_refund, 0)
     )
