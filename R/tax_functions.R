@@ -443,7 +443,7 @@ calculate_federal_income_tax <- function(df, federal_standard_deduction, use_mar
         household_type == "single_adult"  ~ federal_standard_deduction$single_adult
       ),
       health_insurance_premium_used = selected_health_premium,
-      esi_premium_deduction = health_insurance_premium_used * 12, # employer-sponsored insurance premiums are annualized
+      esi_premium_deduction = if (use_marketplace_premium) 0 else health_ins_premium * 12, # employer-sponsored insurance premiums are annualized
       total_fed_deductions  = fed_sd + esi_premium_deduction,
       taxable_income        = pmax(starting_income - total_fed_deductions, 0),
       filing_status         = household_type

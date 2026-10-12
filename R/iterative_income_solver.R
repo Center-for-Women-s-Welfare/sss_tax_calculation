@@ -8,6 +8,8 @@
 #' @param year Tax year (e.g., 2026)
 #' @param state State abbreviation (reserved for future state tax support)
 #' @param health_insurance_scenario One of "employer", "marketplace_unsubsidized", or "marketplace_ptc" (default: "employer")
+#' @param effective_year_ptc Year of the primary tax credit when calculated (default: year)
+#' @param fpl_area FPL geography to use for premium tax credit calculations (default: "FORTY_EIGHT_DC")
 #' @param max_iterations Maximum number of solver iterations (default: 100)
 #' @param tolerance Convergence threshold in dollars (default: 1.0)
 #' @param damping Blending weight applied to the previous estimate on each step (0 = no damping,
@@ -19,6 +21,8 @@ solve_starting_income_iterative <- function(df,
                                             year,
                                             state = NULL,
                                             health_insurance_scenario = "employer",
+                                            effective_year_ptc = year,
+                                            fpl_area = "FORTY_EIGHT_DC",
                                             max_iterations = 100,
                                             tolerance = 1.0,
                                             damping = 0.5,
@@ -75,6 +79,36 @@ solve_starting_income_iterative <- function(df,
   eitc_params  <- credit_params %>% dplyr::filter(credit == "eitc")
   cdctc_params <- credit_params %>% dplyr::filter(credit == "cdctc")
   ctc_params   <- credit_params %>% dplyr::filter(credit == "ctc")
+  
+  ptc_params <- readr::read_csv(system.file("extdata","federal",as.character(year),
+                                            "tax_fed_premium_tax_credit.csv", package="sssTaxCalculation"),
+                                show_col_types = FALSE) %>%
+    dplyr::filter(effective_year_ptc == !!effective_year_ptc)
+  
+  # Federal Poverty Line (FPL) table used for premium tax credit calculations
+  # Keep this outside the iteration loop so it is read once per solver run.
+  fpl_year <- as.integer(effective_year_ptc) - 1L
+  
+  fpl_params <- readr::read_csv(
+    system.file(
+      "extdata", "federal", as.character(year), "tax_fed_poverty_line.csv",
+      package = "sssTaxCalculation"
+    ),
+    show_col_types = FALSE
+  ) %>%
+    dplyr::mutate(
+      effective_year_fpl = as.integer(effective_year_fpl),
+      household_size = as.integer(household_size),
+      fpl_amount = as.numeric(fpl_amount)
+    ) %>%
+    dplyr::filter(effective_year_fpl == !!fpl_year)
+  
+  if (nrow(fpl_params) == 0) {
+    stop(
+      "No FPL rows found for effective_year_fpl = ", fpl_year,
+      " (derived from effective_year_ptc = ", effective_year_ptc, ")."
+    )
+  }
   
   federal_standard_deduction <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_sd.csv",
                                                             package = "sssTaxCalculation"), show_col_types = FALSE) %>%
@@ -140,7 +174,7 @@ solve_starting_income_iterative <- function(df,
     
     df <- calculate_federal_payroll_taxes(df, federal_payroll, year)
     df <- calculate_federal_income_tax(df, federal_standard_deduction,
-                                       use_marketplace_premium = use_marketplace_premium),
+                                       use_marketplace_premium = use_marketplace_premium)
     df <- calculate_tax_from_brackets(df, federal_tax_brackets,
                                       taxable_income_var = "taxable_income",
                                       filing_status_var  = "filing_status",
@@ -148,6 +182,14 @@ solve_starting_income_iterative <- function(df,
     df <- calculate_eitc_credit(df)
     df <- calculate_cdctc_credit(df, cdctc_params_list)
     df <- calculate_ctc_credit(df, ctc_params_list)
+    
+    if (apply_premium_tax_credit) {
+      df <- calculate_premium_tax_credit(
+        df = df,
+        ptc_params = ptc_params,
+        fpl_params = fpl_params
+      )
+    }
     
     if (!is.null(state)) {
       # State payroll taxes (e.g., SUI/WBF-style programs), typically separate
