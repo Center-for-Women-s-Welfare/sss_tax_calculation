@@ -30,11 +30,12 @@
 #'   `starting_income`, and `health_ins_market`.
 #' @param fed_poverty_line Dataframe containing `fpl_year`, `fpl_area`,
 #'   `hh_size`, and `fpl`.
-#' @param fed_premium_tax_credit Dataframe containing `effective_year`,
+#' @param fed_premium_tax_credit Dataframe containing `effective_year_ptc`,
 #'   `income_pct_fpl_min`, `income_pct_fpl_max`,
 #'   `required_income_rate_min`, and `required_income_rate_max`.
-#' @param effective_year Premium tax-credit schedule year. The FPL lookup
-#'   uses `effective_year - 1`.
+#' @param effective_year_ptc Premium tax-credit schedule year. The FPL lookup
+#'   uses `effective_year_ptc - 1`. This can vary independently of the tax
+#'   year for modeling purposes.
 #' @param fpl_area FPL geography to use. Defaults to `"FORTY_EIGHT_DC"`.
 #' @return `calculations_df` with `fpl`, `pct_fpl`, `required_income_rate`,
 #'   and `premium_tax_credit` columns added.
@@ -42,7 +43,7 @@
 calculate_premium_tax_credit <- function(calculations_df,
                                          fed_poverty_line,
                                          fed_premium_tax_credit,
-                                         effective_year,
+                                         effective_year_ptc,
                                          fpl_area = "FORTY_EIGHT_DC") {
   
   # ---- Validate inputs -------------------------------------------------
@@ -72,7 +73,7 @@ calculate_premium_tax_credit <- function(calculations_df,
   }
   
   required_ptc_cols <- c(
-    "effective_year",
+    "effective_year_ptc",
     "income_pct_fpl_min",
     "income_pct_fpl_max",
     "required_income_rate_min",
@@ -91,7 +92,7 @@ calculate_premium_tax_credit <- function(calculations_df,
   
   # ---- Step 1: household income as a percentage of the FPL -------------
   # The PTC schedule for a given effective year uses the prior year's FPL.
-  fpl_year_value <- effective_year - 1
+  fpl_year_value <- effective_year_ptc - 1
   
   fpl_lookup <- fed_poverty_line %>%
     dplyr::filter(
@@ -126,13 +127,13 @@ calculate_premium_tax_credit <- function(calculations_df,
   
   # ---- Step 2: required income rate from the PTC bracket schedule ------
   ptc_schedule <- fed_premium_tax_credit %>%
-    dplyr::filter(.data$effective_year == !!effective_year) %>%
+    dplyr::filter(.data$effective_year_ptc == !!effective_year_ptc) %>%
     dplyr::arrange(.data$income_pct_fpl_min)
   
   if (nrow(ptc_schedule) == 0) {
     stop(
-      "No premium tax-credit schedule found for effective_year = ",
-      effective_year,
+      "No premium tax-credit schedule found for effective_year_ptc = ",
+      effective_year_ptc,
       "."
     )
   }
