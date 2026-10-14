@@ -79,12 +79,12 @@ solve_starting_income_iterative <- function(df,
   eitc_params  <- credit_params %>% dplyr::filter(credit == "eitc")
   cdctc_params <- credit_params %>% dplyr::filter(credit == "cdctc")
   ctc_params   <- credit_params %>% dplyr::filter(credit == "ctc")
-  
+
   ptc_params <- readr::read_csv(system.file("extdata","federal",as.character(year),
                                             "tax_fed_premium_tax_credit.csv", package="sssTaxCalculation"),
                                 show_col_types = FALSE) %>%
     dplyr::filter(effective_year_ptc == !!effective_year_ptc)
-  
+
   # Federal Poverty Line (FPL) table used for premium tax credit calculations
   # Keep this outside the iteration loop so it is read once per solver run.
   fpl_year <- as.integer(effective_year_ptc) - 1L
@@ -97,18 +97,29 @@ solve_starting_income_iterative <- function(df,
     show_col_types = FALSE
   ) %>%
     dplyr::mutate(
-      effective_year_fpl = as.integer(effective_year_fpl),
-      household_size = as.integer(household_size),
-      fpl_amount = as.numeric(fpl_amount)
+      effective_year_fpl = as.integer(fpl_year),
+      household_size = as.integer(hh_size),
+      fpl_amount = as.numeric(fpl)
     ) %>%
-    dplyr::filter(effective_year_fpl == !!fpl_year)
-  
+    dplyr::filter(effective_year_fpl == !!fpl_year & fpl_area == !!fpl_area)
+
   if (nrow(fpl_params) == 0) {
     stop(
       "No FPL rows found for effective_year_fpl = ", fpl_year,
       " (derived from effective_year_ptc = ", effective_year_ptc, ")."
     )
   }
+  
+  max_hh <- max(fpl_params$household_size, na.rm = TRUE)
+  
+  df <- df %>%
+    mutate(fpl_household_size = pmin(household_size, max_hh)) %>%
+    left_join(
+      fpl_params,
+      by = c("fpl_household_size" = "household_size"),
+      relationship = "many-to-one"
+    ) %>%
+    select(-fpl_household_size)
   
   federal_standard_deduction <- readr::read_csv(system.file("extdata", "federal", as.character(year), "tax_fed_sd.csv",
                                                             package = "sssTaxCalculation"), show_col_types = FALSE) %>%
@@ -163,6 +174,8 @@ solve_starting_income_iterative <- function(df,
         "ctc_income_based_refund", "ctc_refund_1to2_children", "ctc_payroll_based_refund",
         "ctc_refund_3plus_children", "ctc_refundable", "ctc_credit",
         "fed_cdctc_applied", "federal_tax_after_nonrefundable", "fed_ctc_nonrefundable_applied",
+        "pct_fpl", "required_income_rate", "annual_market_premium",
+        "ptc_eligible","expected_contribution", "premium_tax_credit",
         "federal_total_refundable_credits", "federal_tax_liability_with_refund", "final_federal_income_tax",
         "state_nonrefundable_credit_applied", "state_tax_after_nonrefundable",
         "state_tax_liability_with_refund", "final_state_income_tax",

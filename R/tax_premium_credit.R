@@ -1,200 +1,123 @@
-# tax_premium_credit.R
-# Marketplace premium tax credit helper functions
-
 #' Calculate marketplace premium tax credit
 #'
-#' Matches each household's size to the applicable federal poverty-line (FPL)
-#' amount for the year before the premium tax-credit schedule year, calculates
-#' income as a percentage of that FPL amount, interpolates the required
-#' household contribution rate from the premium tax-credit bracket schedule,
-#' and calculates the resulting premium tax credit.
+#' Expects pre-filtered parameter tables supplied by the solver:
+#' - fpl_params: one row per household size for the applicable FPL year/area
+#' - ptc_params: bracket schedule for one effective_year_ptc
 #'
-#' The final formula is:
-#'
-#' \deqn{
-#' premium\_tax\_credit =
-#' (health\_ins\_market \times 12) -
-#' (required\_income\_rate \times starting\_income)
-#' }
-#'
-#' `health_ins_market` is assumed to be a monthly amount and is annualized
-#' (multiplied by 12) before being compared to annual `starting_income`.
-#'
-#' Household sizes above 20 use the 20-person FPL row, which is the largest
-#' household size represented in the federal poverty-line data. FPL
-#' percentages below the lowest premium tax-credit bracket are clamped to
-#' that bracket. For an open-ended bracket with an infinite upper bound, the
-#' minimum bracket rate is used directly.
-#'
-#' @param calculations_df Dataframe containing `household_size`,
-#'   `starting_income`, and `health_ins_market`.
-#' @param fed_poverty_line Dataframe containing `fpl_year`, `fpl_area`,
-#'   `hh_size`, and `fpl`.
-#' @param fed_premium_tax_credit Dataframe containing `effective_year_ptc`,
-#'   `income_pct_fpl_min`, `income_pct_fpl_max`,
-#'   `required_income_rate_min`, and `required_income_rate_max`.
-#' @param effective_year_ptc Premium tax-credit schedule year. The FPL lookup
-#'   uses `effective_year_ptc - 1`. This can vary independently of the tax
-#'   year for modeling purposes.
-#' @param fpl_area FPL geography to use. Defaults to `"FORTY_EIGHT_DC"`.
-#' @return `calculations_df` with `fpl`, `pct_fpl`, `required_income_rate`,
-#'   and `premium_tax_credit` columns added.
+#' @param df Dataframe containing household_size, starting_income, health_ins_market
+#' @param fpl_params Dataframe with columns household_size, fpl_amount
+#' @param ptc_params Dataframe with columns income_pct_fpl_min, income_pct_fpl_max,
+#'   required_income_rate_min, required_income_rate_max
+#' @return df with fpl_amount, pct_fpl, required_income_rate, premium_tax_credit
 #' @export
-calculate_premium_tax_credit <- function(calculations_df,
-                                         fed_poverty_line,
-                                         fed_premium_tax_credit,
-                                         effective_year_ptc,
-                                         fpl_area = "FORTY_EIGHT_DC") {
+calculate_premium_tax_credit <- function(df, fpl_params, ptc_params) {
   
-  # ---- Validate inputs -------------------------------------------------
-  required_calculation_cols <- c(
-    "household_size",
-    "starting_income",
-    "health_ins_market"
-  )
-  missing_calculation_cols <- setdiff(
-    required_calculation_cols,
-    names(calculations_df)
-  )
+  required_calculation_cols <- c("household_size", "starting_income", "health_ins_market")
+  missing_calculation_cols <- setdiff(required_calculation_cols, names(df))
   if (length(missing_calculation_cols) > 0) {
-    stop(
-      "calculations_df is missing required columns: ",
-      paste(missing_calculation_cols, collapse = ", ")
-    )
+    stop("df is missing required columns: ",
+         paste(missing_calculation_cols, collapse = ", "))
   }
   
-  required_fpl_cols <- c("fpl_year", "fpl_area", "hh_size", "fpl")
-  missing_fpl_cols <- setdiff(required_fpl_cols, names(fed_poverty_line))
+  required_fpl_cols <- c("household_size", "fpl_amount")
+  missing_fpl_cols <- setdiff(required_fpl_cols, names(fpl_params))
   if (length(missing_fpl_cols) > 0) {
-    stop(
-      "fed_poverty_line is missing required columns: ",
-      paste(missing_fpl_cols, collapse = ", ")
-    )
+    stop("fpl_params is missing required columns: ",
+         paste(missing_fpl_cols, collapse = ", "))
   }
   
   required_ptc_cols <- c(
-    "effective_year_ptc",
-    "income_pct_fpl_min",
-    "income_pct_fpl_max",
-    "required_income_rate_min",
-    "required_income_rate_max"
+    "income_pct_fpl_min", "income_pct_fpl_max",
+    "required_income_rate_min", "required_income_rate_max"
   )
-  missing_ptc_cols <- setdiff(
-    required_ptc_cols,
-    names(fed_premium_tax_credit)
-  )
+  missing_ptc_cols <- setdiff(required_ptc_cols, names(ptc_params))
   if (length(missing_ptc_cols) > 0) {
-    stop(
-      "fed_premium_tax_credit is missing required columns: ",
-      paste(missing_ptc_cols, collapse = ", ")
-    )
+    stop("ptc_params is missing required columns: ",
+         paste(missing_ptc_cols, collapse = ", "))
   }
   
-  # ---- Step 1: household income as a percentage of the FPL -------------
-  # The PTC schedule for a given effective year uses the prior year's FPL.
-  fpl_year_value <- effective_year_ptc - 1
+  ptc_params <- ptc_params %>%
+    arrange(income_pct_fpl_min)
   
-  fpl_lookup <- fed_poverty_line %>%
-    dplyr::filter(
-      .data$fpl_year == fpl_year_value,
-      .data$fpl_area == fpl_area
-    ) %>%
-    dplyr::select(.data$hh_size, .data$fpl)
-  
-  if (nrow(fpl_lookup) == 0) {
-    stop(
-      "No federal poverty-line data found for fpl_year = ",
-      fpl_year_value,
-      " and fpl_area = ",
-      fpl_area,
-      "."
+  # 1) Income as percent of FPL
+  df <- df %>%
+    mutate(
+      pct_fpl = (starting_income / fpl_amount) * 100
     )
-  }
   
-  calculations_df <- calculations_df %>%
-    dplyr::mutate(
-      fpl_household_size = pmin(.data$household_size, max(fpl_lookup$hh_size))
-    ) %>%
-    dplyr::left_join(
-      fpl_lookup,
-      by = c("fpl_household_size" = "hh_size"),
-      relationship = "many-to-one"
-    ) %>%
-    dplyr::mutate(
-      pct_fpl = (.data$starting_income / .data$fpl) * 100
-    ) %>%
-    dplyr::select(-.data$fpl_household_size)
-  
-  # ---- Step 2: required income rate from the PTC bracket schedule ------
-  ptc_schedule <- fed_premium_tax_credit %>%
-    dplyr::filter(.data$effective_year_ptc == !!effective_year_ptc) %>%
-    dplyr::arrange(.data$income_pct_fpl_min)
-  
-  if (nrow(ptc_schedule) == 0) {
-    stop(
-      "No premium tax-credit schedule found for effective_year_ptc = ",
-      effective_year_ptc,
-      "."
-    )
-  }
-  
-  minimum_pct_fpl <- min(ptc_schedule$income_pct_fpl_min)
-  
-  # Clamp values below the schedule to its first bracket. Values above a
-  # finite final bracket remain unmatched and receive NA.
-  pct_fpl_for_rate <- pmax(calculations_df$pct_fpl, minimum_pct_fpl)
+  # 2) Required contribution rate via bracket interpolation
+  minimum_pct_fpl <- min(ptc_params$income_pct_fpl_min, na.rm = TRUE)
+  pct_fpl_for_rate <- pmax(df$pct_fpl, minimum_pct_fpl)
   
   bracket_index <- vapply(
     pct_fpl_for_rate,
-    function(pct_fpl_value) {
-      if (is.na(pct_fpl_value)) {
-        return(NA_integer_)
-      }
-      
-      matched_rows <- which(
-        pct_fpl_value >= ptc_schedule$income_pct_fpl_min &
-          (
-            pct_fpl_value < ptc_schedule$income_pct_fpl_max |
-              is.infinite(ptc_schedule$income_pct_fpl_max)
-          )
+    function(x) {
+      if (is.na(x)) return(NA_integer_)
+      idx <- which(
+        x >= ptc_params$income_pct_fpl_min &
+          (x < ptc_params$income_pct_fpl_max | is.infinite(ptc_params$income_pct_fpl_max))
       )
-      
-      if (length(matched_rows) == 0) {
-        return(NA_integer_)
-      }
-      
-      matched_rows[[1]]
+      if (length(idx) == 0) return(NA_integer_)
+      idx[[1]]
     },
     integer(1)
   )
   
-  required_income_rate <- rep(NA_real_, nrow(calculations_df))
+  required_income_rate <- rep(NA_real_, nrow(df))
   matched <- !is.na(bracket_index)
   
   if (any(matched)) {
-    matched_min_pct_fpl <- ptc_schedule$income_pct_fpl_min[bracket_index[matched]]
-    matched_max_pct_fpl <- ptc_schedule$income_pct_fpl_max[bracket_index[matched]]
-    matched_min_rate <- ptc_schedule$required_income_rate_min[bracket_index[matched]]
-    matched_max_rate <- ptc_schedule$required_income_rate_max[bracket_index[matched]]
+    min_pct <- ptc_params$income_pct_fpl_min[bracket_index[matched]]
+    max_pct <- ptc_params$income_pct_fpl_max[bracket_index[matched]]
+    min_rt  <- ptc_params$required_income_rate_min[bracket_index[matched]]
+    max_rt  <- ptc_params$required_income_rate_max[bracket_index[matched]]
     
-    interpolation_proportion <- ifelse(
-      is.infinite(matched_max_pct_fpl),
+    prop <- ifelse(
+      is.infinite(max_pct),
       0,
-      (pct_fpl_for_rate[matched] - matched_min_pct_fpl) /
-        (matched_max_pct_fpl - matched_min_pct_fpl)
+      (pct_fpl_for_rate[matched] - min_pct) / (max_pct - min_pct)
     )
     
-    required_income_rate[matched] <- matched_min_rate +
-      interpolation_proportion * (matched_max_rate - matched_min_rate)
+    required_income_rate[matched] <- min_rt + prop * (max_rt - min_rt)
   }
   
-  calculations_df$required_income_rate <- required_income_rate
+  df <- df %>%
+    dplyr::mutate(required_income_rate = required_income_rate)
+  # Highest finite upper bound of the schedule. If the schedule has no
+  # open-ended (Inf) bracket, incomes at or above this are ineligible
+  # (e.g. 2026: no PTC at or above 400% FPL).
+  has_open_top  <- any(is.infinite(ptc_params$income_pct_fpl_max))
+  schedule_top  <- max(ptc_params$income_pct_fpl_max[is.finite(ptc_params$income_pct_fpl_max)])
   
-  # ---- Step 3: final premium tax credit ---------------------------------
-  calculations_df %>%
+  df <- df %>%
+    mutate(
+      required_income_rate = required_income_rate,
+      ptc_eligible = if (has_open_top) {
+        !is.na(pct_fpl)
+      } else {
+        !is.na(pct_fpl) & pct_fpl < schedule_top
+      }
+    )
+  
+  # Rows that are eligible must have a rate; ineligible rows legitimately do not.
+  if (anyNA(df$pct_fpl)) {
+    stop("pct_fpl is NA for some rows; check starting_income and FPL join.")
+  }
+  if (any(df$ptc_eligible & is.na(df$required_income_rate))) {
+    stop("required_income_rate is NA for eligible rows; check ptc_params bracket coverage.")
+  }
+  
+  # 3) PTC amount: max(0, annual benchmark premium - expected contribution)
+  df  <- df %>%
     dplyr::mutate(
-      premium_tax_credit =
-        (.data$health_ins_market * 12) -
-        (.data$required_income_rate * .data$starting_income)
+      annual_market_premium = .data$health_ins_market * 12,
+      expected_contribution = dplyr::if_else(
+        .data$ptc_eligible, .data$required_income_rate * .data$starting_income, NA_real_
+      ),
+      premium_tax_credit = dplyr::if_else(
+        .data$ptc_eligible,
+        pmax(0, .data$annual_market_premium - .data$expected_contribution),
+        0
+      )
     )
 }
