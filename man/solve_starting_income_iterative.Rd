@@ -8,6 +8,9 @@ solve_starting_income_iterative(
   df,
   year,
   state = NULL,
+  health_insurance_scenario = "employer",
+  effective_year_ptc = year,
+  fpl_area = "FORTY_EIGHT_DC",
   max_iterations = 100,
   tolerance = 1,
   damping = 0.5,
@@ -21,6 +24,12 @@ solve_starting_income_iterative(
 \item{year}{Tax year (e.g., 2026)}
 
 \item{state}{State abbreviation (reserved for future state tax support)}
+
+\item{health_insurance_scenario}{One of "employer", "marketplace_unsubsidized", or "marketplace_ptc" (default: "employer")}
+
+\item{effective_year_ptc}{Year of the primary tax credit when calculated (default: year)}
+
+\item{fpl_area}{FPL geography to use for premium tax credit calculations (default: "FORTY_EIGHT_DC")}
 
 \item{max_iterations}{Maximum number of solver iterations (default: 100)}
 

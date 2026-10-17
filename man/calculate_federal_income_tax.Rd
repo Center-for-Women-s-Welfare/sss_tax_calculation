@@ -4,12 +4,20 @@
 \alias{calculate_federal_income_tax}
 \title{Calculate Federal Income Tax Deductions and Taxable Income}
 \usage{
-calculate_federal_income_tax(df, federal_standard_deduction)
+calculate_federal_income_tax(
+  df,
+  federal_standard_deduction,
+  use_marketplace_premium = FALSE
+)
 }
 \arguments{
-\item{df}{Dataframe with starting_income, household_type, health_ins_premium}
+\item{df}{Dataframe with starting_income, household_type, and health-insurance
+premium columns.}
 
 \item{federal_standard_deduction}{Dataframe with standard deductions by filing status}
+
+\item{use_marketplace_premium}{If TRUE, use \code{health_ins_market} when present,
+falling back to \code{health_ins_premium} when the marketplace value is missing.}
 }
 \value{
 Dataframe with deduction and taxable income columns added

@@ -8,7 +8,7 @@ calculate_final_federal_income_tax(df)
 }
 \arguments{
 \item{df}{Dataframe with federal_cumulative_tax, cdctc_credit, ctc_nonrefundable,
-ctc_refundable, eitc_credit}
+ctc_refundable, eitc_credit, and (optionally) premium_tax_credit}
 }
 \value{
 Dataframe with final federal income tax calculation columns added:
@@ -19,5 +19,6 @@ federal_tax_liability_with_refund, final_federal_income_tax
 \description{
 Applies credits in statutory order to calculate final federal income tax liability:
 (1) CDCTC (non-refundable) against gross tax, (2) non-refundable CTC against remaining
-tax, (3) refundable credits (CTC refundable + EITC) against remaining liability.
+tax, (3) refundable credits (CTC refundable + EITC (+ premium tax credit, when
+present)) against remaining liability.
 }

@@ -13,6 +13,7 @@ create_mock_df <- function(nrows = 10) {
     adult = sample(1:5, nrows, replace = TRUE),
     child_care_cost = runif(nrows, min = 0, max = 2000),
     health_ins_premium = runif(nrows, min = 0, max = 3000),
+    tax_rate_local = runif(nrows, min = 0, max = 0.1),
     county_table_number = sample(1:50, nrows, replace = TRUE),
     stringsAsFactors = FALSE
   )
