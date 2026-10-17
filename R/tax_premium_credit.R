@@ -37,7 +37,7 @@ calculate_premium_tax_credit <- function(df, fpl_params, ptc_params) {
   }
   
   ptc_params <- ptc_params %>%
-    arrange(income_pct_fpl_min)
+    dplyr::arrange(income_pct_fpl_min)
   
   # 1) Income as percent of FPL
   df <- df %>%

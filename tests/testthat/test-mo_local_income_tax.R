@@ -13,6 +13,7 @@ create_mo_local_tax_df <- function(local_rate = 0.01) {
     household_type      = "single_adult",
     adult               = 1L,
     children            = 0L,
+    household_size      = 1L,
     subtotal2           = 3250,
     subtotal3           = 3250,
     child_care_cost     = 0,
