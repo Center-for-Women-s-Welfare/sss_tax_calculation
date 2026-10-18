@@ -97,8 +97,10 @@ calculate_state_payroll_taxes <- function(calculations_df, tax_state_payroll_df,
     calculations_df <- calculations_df %>%
       dplyr::mutate(
         # Match federal payroll treatment: split married household income evenly.
-        income_for_tax = dplyr::if_else(household_type == "married", starting_income / 2, starting_income),
-        !!tax_column   := if (!is.na(flat) && flat > 0) flat else calculate_program_tax(income_for_tax, rate, cap),
+        income_for_tax = dplyr::if_else(household_type == "married", 
+                                        starting_income / 2, 
+                                        starting_income),
+        !!tax_column   := if (!is.na(flat) && flat > 0) flat else dplyr::if_else(household_type == "married", 2 * calculate_program_tax(income_for_tax, rate, cap), calculate_program_tax(income_for_tax, rate, cap)),
         # Accumulate all program-specific payroll taxes into one state total.
         state_payroll_tax = state_payroll_tax + !!rlang::sym(tax_column)
       )

@@ -255,6 +255,7 @@ solve_starting_income_iterative <- function(df,
       df$state_tax_liability_with_refund <- 0
       df$state_refundable_credits        <- 0
       df$state_nonrefundable_credits     <- 0
+    }
     
     df <- calculate_final_federal_income_tax(df)
     
@@ -313,7 +314,7 @@ solve_starting_income_iterative <- function(df,
     # starting_income was updated at the end of the last iteration, after local
     # tax was computed. Recompute so local_income_tax matches the returned income.
     df <- df %>% dplyr::select(-dplyr::any_of("local_income_tax"))
-    df <- .compute_local_tax(df, state, state_params)
+     df <- .compute_local_tax(df, state, state_params)
     
     if (debug) print_iteration_progress(iter, df, show_every = 1)
     

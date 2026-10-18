@@ -2,7 +2,7 @@
 # Usage (from repo root):
 #   source("tests/testthat/helper-update-employer-golden-fixture.R")
 #   update_employer_golden_fixture()
-#   devtools::test(filter = "health-insurance-scenarios-regression")3.
+#   devtools::test(filter = "health-insurance-scenarios-regression")
 #
 # Optional:
 #   update_employer_golden_fixture(write = FALSE)  # preview only

@@ -166,7 +166,7 @@
     required_methods
   )
   
-  vals_num <- as.numeric(vals)
+  vals_num <- as.numeric(unlist(vals, use.names = FALSE))
   names(vals_num) <- required_methods
   
   missing_vals <- names(vals_num)[is.na(vals_num)]
