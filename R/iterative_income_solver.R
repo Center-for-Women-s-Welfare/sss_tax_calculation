@@ -255,6 +255,7 @@ solve_starting_income_iterative <- function(df,
       df$state_tax_liability_with_refund <- 0
       df$state_refundable_credits        <- 0
       df$state_nonrefundable_credits     <- 0
+      df$local_income_tax                <- 0
     }
     
     df <- calculate_final_federal_income_tax(df)
