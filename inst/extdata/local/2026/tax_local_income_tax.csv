@@ -1,0 +1,26 @@
+state_id,geography,geography_applied,tax_type,census_geography,source,data_collected_date,data_collected_by,data_processed_date,data_processed_by
+AL,municipality,selectively,percent,place,"Alabama League of Municipalities. ""Municipal Tax Rates.""
+https://almonline.org/TaxRates.aspx#OccupationalTax
+Accessed April 29, 2026.",4/29/2026,KSe,4/29/2026,KSe
+CO,municipality,selectively,flat_fee,place,"DeWitt, Kaylee. “A Breakdown of the Colorado Occupational Privilege Taxes.” Patriot Software, October 13, 2022. https://www.patriotsoftware.com/blog/payroll/occupational-privilege-tax-opt-colorado/.",4/30/2026,KSe,5/3/2026,KSe
+DE,municipality,selectively,percent,place,"City of Wilmington Department of Finance. Earned Income Tax Regulations of the City of Wilmington. Wilmington, DE: City of Wilmington, 2020. https://www.wilmingtonde.gov/home/showpublisheddocument/462/638206223264700000.",5/3/2026,KSe,5/3/2026,KSe
+IN,county,universally,percent,county,"Indiana Department of Revenue. Departmental Notice #1. Effective January 1, 2026. (R46 / 01-26). Indiana Government Center, 100 N. Senate Ave., Indianapolis, IN 46204. Accessed March 29, 2026.
+ https://www.in.gov/dor/files/dn01.pdf",3/29/2026,KSe,3/29/2026,KSe
+IA,school_district,universally,surtax,county,"Iowa Department of Revenue. Iowa Counties, School District Numbers, Surtax Rates for 2025. Des Moines, IA. Accessed March 29, 2026. https://revenue.iowa.gov/media/4382/download?inline",4/1/2026,KSe,7/1/2026,KSe
+KY,municipality,selectively,percent,place,"Kentucky Secretary of State. “Occupational Taxes.” Commonwealth of Kentucky. Accessed June 17, 2026. https://web.sos.ky.gov/occupationaltax/.",4/9/2026,KSe,6/23/2026,KSe
+KY,county,universally,percent,county,"Kentucky Association of Counties. n.d. ""Data Brief: 2025 County Occupational Taxes."" https://www.kaco.org/articles/data-brief-2025-county-occupational-taxes/. Accessed April 9, 2026.",4/9/2026,KSe,6/23/2026,KSe
+MD,county,universally,bracket,county,NA,4/10/2026,KSe,NA,NA
+MI,municipality,selectively,percent,place,"Michigan Department of Treasury. “Which Cities Impose an Income Tax?” State of Michigan. Accessed July 1, 2026. https://www.michigan.gov/taxes/questions/iit/accordion/general/what-cities-impose-an-income-tax.",4/10/2026,KSe,7/1/2026,KSe
+MO,municipality,selectively,percent,place,"Tax-Rates.org. “Local Income Tax Rates in Missouri.” Accessed April 12, 2026. https://www.tax-rates.org/missouri/local-income-taxes.",4/12/2026,KSe,4/16/2026,KSe
+NJ,municipality,selectively,percent,place,"City of Newark. “Payroll Tax.” Accessed April 16, 2026. https://www.newarknj.gov/647/Payroll-Tax.",4/16/2026,KSe,4/16/2026,KSe
+NY,municipality,selectively,bracket,NA,NA,NA,NA,NA,NA
+NY,special_authority,selectively,percent,NA,NA,NA,NA,NA,NA
+OH,municipality,universally,percent,place,"Ohio Department of Taxation. Municipal Income Tax Rates and Instructions. Accessed March 26, 2026. https://thefinder.tax.ohio.gov/StreamlineSalesTaxWeb/Download/MuniRateTableInstructions.aspx.",3/26/2026,KSe,6/1/2026,KSe
+OH,school_district,universally,percent,county,"Ohio Department of Taxation. Ohio Public School District Income Tax Rates. Accessed March 26, 2026. https://thefinder.tax.ohio.gov/StreamlineSalesTaxWeb/Download/SDRateTableInstructions.aspx.",3/26/2026,KSe,6/1/2026,KSe
+OR,county,selectively,bracket,NA,NA,NA,NA,NA,NA
+OR,special_authority,selectively,percent,NA,NA,NA,NA,NA,NA
+PA,municipality,universally,percent,county_subdivision,"Pennsylvania Department of Community & Economic Development. ""EIT / PIT / LST Tax Registers (Real-Time)."" Accessed April 17, 2026. https://apps.dced.pa.gov/munstats-public/ReportInformation2.aspx?report=EitWithCollector_Dyn_Excel&type=R.",4/17/2026,KSe,4/29/2026,KSe
+PA,school_district,universally,percent,county_subdivision,"Pennsylvania Department of Community & Economic Development. ""EIT / PIT / LST Tax Registers (Real-Time)."" Accessed April 17, 2026. https://apps.dced.pa.gov/munstats-public/ReportInformation2.aspx?report=EitWithCollector_Dyn_Excel&type=R.",4/17/2026,KSe,4/29/2026,KSe
+WV,municipality,selectively,flat_fee,place,"Charleston, West Virginia. ""City Service Fee Overview"". Accessed April 23, 2026. https://www.charlestonwv.gov/sites/default/files/documents/2022-12/CITY%20SERVICE%20FEE%20OVERVIEW%2012.22%20%282%29.pdf
+City of Weirton, West Virginia. ""Municipal Service Fee Ordinance: Administrative Regulations."" Accessed April 23, 2026. https://www.cityofweirton.com/DocumentCenter/View/68/Municipal-Service-Fee-Administrative-Regulations-PDF
+City of Wheeling, West Virginia. ""City Service Fee Overview."" Accessed June 3, 2026. https://www.wheelingwv.gov/media/Finance/City%20Service%20Fee/City%20Service%20Fee%20-%20Overview.pdf",6/3/2026,KSe,6/3/2026,KSe

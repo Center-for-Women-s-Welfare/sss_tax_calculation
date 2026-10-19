@@ -7,7 +7,7 @@
 apply_commuter_deduction(calculations_df, state_adjustments, calculation_vars)
 }
 \arguments{
-\item{calculations_df}{Dataframe with public_transit_cost}
+\item{calculations_df}{Dataframe with \code{public_transit_cost}}
 
 \item{state_adjustments}{Dataframe of state TI-adjustment rows already
 filtered to taxable_income_subtraction type}
@@ -20,10 +20,20 @@ Dataframe with a \code{commuter_deduction} column added when applicable,
 otherwise unchanged
 }
 \description{
-Computes a state-specific commuter expense deduction (e.g., MA) when the
-state's TI-adjustment parameters define a \code{commuter_deduction} variable using
-the \code{commuter_formula} method: \code{min(max(public_transit_cost - threshold, 0), max)}.
+Computes a state-specific commuter expense deduction when taxable-income
+adjustment parameters include \code{variable_name == "commuter_deduction"}.
 }
 \details{
-Called by \code{\link[=calculate_state_taxable_income]{calculate_state_taxable_income()}} after the general adjustment loop.
+Parameters are grouped under \code{commuter_deduction} and distinguished by
+\code{calculation_method}. This rule requires:
+\itemize{
+\item \code{commuter_max}
+\item \code{commuter_exclusion}
+}
+
+Formula:
+\code{pmin(pmax(public_transit_cost - commuter_exclusion, 0), commuter_max)}
+
+Called by \code{\link[=calculate_state_taxable_income]{calculate_state_taxable_income()}} after the general adjustment
+loop.
 }
