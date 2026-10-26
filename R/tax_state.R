@@ -413,7 +413,7 @@ calculate_state_tax_credits <- function(calculations_df,
   
   # Detect "special" credit variables the same way we now detect special TI-adjustment
   # variables: by counting distinct calculation_method values per variable_name, rather
-  # than relying on a "^special_" naming convention in calculation_method. A variable_name
+  # than relying exclusively on a "^special_" naming convention in calculation_method. A variable_name
   # with more than one method (e.g. multiple parameter rows feeding one formula, like
   # child_dependent_care's percent_of_fed_cdctc / percent_of_fed_cdctc_estimate /
   # ny_pre2026_federal_brackets) is treated as special and excluded from the generic loop.
@@ -437,7 +437,8 @@ calculate_state_tax_credits <- function(calculations_df,
   # handler further below, even if they currently have only one method row.
   delegated_credit_vars <- c(
     "child_dependent_care",
-    "property_tax_credit"
+    "property_tax_credit",
+    "special_wa_wftc"
   )
   
   special_credit_vars <- union(
@@ -446,6 +447,7 @@ calculate_state_tax_credits <- function(calculations_df,
   )
   
   credit_vars <- state_credits %>%
+    dplyr::filter(!grepl("^special_", calculation_method)) %>%
     dplyr::pull(variable_name) %>%
     unique() %>%
     setdiff(c("dummy", special_credit_vars))  
