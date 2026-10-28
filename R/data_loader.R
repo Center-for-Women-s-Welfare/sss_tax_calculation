@@ -6,7 +6,9 @@
 #' Loads all federal tax parameter CSVs for a specific year from the package data directory
 #'
 #' @param year Tax year (e.g., 2026)
-#' @return Named list with four dataframes: fed_payroll, fed_credits, fed_brackets, fed_sd
+#' @return Named list with federal parameter tables:
+#'   `fed_payroll`, `fed_credits`, `fed_brackets`, `fed_sd`,
+#'   `fed_premium_tax_credit`, and `fed_poverty_line`
 load_federal_tax_params <- function(year) {
 
   fed_tax_dir <- system.file("extdata", "federal", as.character(year),
@@ -134,4 +136,3 @@ load_state_tax_params <- function(year, state) {
     local_income_tax_brackets   = local_income_tax_brackets      # tibble(), or bracket table when needed
   )
   }
-

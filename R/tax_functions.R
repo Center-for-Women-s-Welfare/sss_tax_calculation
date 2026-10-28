@@ -411,30 +411,51 @@ calculate_ctc_credit <- function(df, ctc_params_list) {
 #' @param df Dataframe with starting_income, household_type, and health-insurance
 #'   premium columns.
 #' @param federal_standard_deduction Dataframe with standard deductions by filing status
-#' @param use_marketplace_premium If TRUE, use `health_ins_market` when present,
-#'   falling back to `health_ins_premium` when the marketplace value is missing.
+#' @param default_health_insurance_scenario Scenario applied when a row does not
+#'   already provide `health_insurance_scenario`. Must be one of
+#'   `"employer"`, `"marketplace"`, `"marketplace_unsubsidized"`,
+#'   or `"marketplace_ptc"`.
 #' @return Dataframe with deduction and taxable income columns added
-calculate_federal_income_tax <- function(df, federal_standard_deduction, use_marketplace_premium = FALSE) {
+calculate_federal_income_tax <- function(df,
+                                         federal_standard_deduction,
+                                         default_health_insurance_scenario = "employer") {
 
-    employer_premium <- if ("health_ins_premium" %in% names(df)) {
-        df$health_ins_premium
-      } else {
-          rep(NA_real_, nrow(df))
-        }
-  
-    marketplace_premium <- if ("health_ins_market" %in% names(df)) {
-          df$health_ins_market
-        } else {
-            rep(NA_real_, nrow(df))
-          }
-    
-    selected_health_premium <- if (use_marketplace_premium) {
-            dplyr::coalesce(marketplace_premium, employer_premium)
-          } else {
-              employer_premium
-            }
-      
-  
+  employer_premium <- if ("health_ins_premium" %in% names(df)) {
+    df$health_ins_premium
+  } else {
+    rep(NA_real_, nrow(df))
+  }
+
+  marketplace_premium <- if ("health_ins_market" %in% names(df)) {
+    df$health_ins_market
+  } else {
+    rep(NA_real_, nrow(df))
+  }
+
+  upstream_selected_premium <- if ("health_insurance_premium_used" %in% names(df)) {
+    df$health_insurance_premium_used
+  } else {
+    rep(NA_real_, nrow(df))
+  }
+
+  row_scenario <- if ("health_insurance_scenario" %in% names(df)) {
+    dplyr::coalesce(df$health_insurance_scenario, default_health_insurance_scenario)
+  } else {
+    rep(default_health_insurance_scenario, nrow(df))
+  }
+
+  marketplace_scenarios <- c("marketplace", "marketplace_unsubsidized", "marketplace_ptc")
+  row_is_marketplace <- row_scenario %in% marketplace_scenarios
+  legacy_selected_premium <- ifelse(
+    row_is_marketplace,
+    dplyr::coalesce(marketplace_premium, employer_premium),
+    employer_premium
+  )
+
+  selected_health_premium <- dplyr::coalesce(upstream_selected_premium, legacy_selected_premium)
+  selected_health_premium <- dplyr::coalesce(selected_health_premium, 0)
+  esi_premium_deduction <- ifelse(row_scenario == "employer", selected_health_premium * 12, 0)
+
   df %>%
     mutate(
       fed_sd = case_when(
