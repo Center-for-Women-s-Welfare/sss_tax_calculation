@@ -7,6 +7,6 @@
 #' @importFrom dplyr `%>%`
 #' @importFrom tidyr pivot_wider pivot_longer
 #' @importFrom readr read_csv
-#' @importFrom rlang `!!` .data sym
+#' @importFrom rlang .data sym
 #' @importFrom utils head
 NULL

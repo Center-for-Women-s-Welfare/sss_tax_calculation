@@ -10,6 +10,7 @@ create_wa_smoke_df <- function() {
     household_type      = c("single_adult", "single_parent", "married"),
     adult               = c(1L, 1L, 2L),
     children            = c(0L, 2L, 1L),
+    household_size      = c(1L, 3L, 3L),  # adult + children
     subtotal2           = c(3200, 4800, 5500),
     subtotal3           = c(3250, 4900, 5600),
     child_care_cost     = c(0, 1200, 800),
@@ -67,6 +68,7 @@ test_that("WA WFTC credit is present and non-zero for a low-income family with c
     household_type      = "single_parent",
     adult               = 1L,
     children            = 1L,
+    household_size      = 2L,  # adult + children
     subtotal2           = 2600,
     subtotal3           = 2650,
     child_care_cost     = 500,

@@ -7,26 +7,28 @@
 apply_renters_deduction(calculations_df, state_adjustments, calculation_vars)
 }
 \arguments{
-\item{calculations_df}{Dataframe with housing_cost}
+\item{calculations_df}{Dataframe with housing_cost and state_filing_status}
 
 \item{state_adjustments}{Dataframe of state TI-adjustment rows already
-filtered to taxable_income_subtraction type}
+filtered to taxable_income_subtraction}
 
-\item{calculation_vars}{Character vector of all variable_name values present
-in state_adjustments}
+\item{calculation_vars}{Character vector of variable names present in
+state_adjustments}
 }
 \value{
-Dataframe with a \code{renters_deduction} column added when applicable,
-otherwise unchanged
+Dataframe with renters_deduction added when applicable
 }
 \description{
-Computes a state-specific renters deduction when the state's TI-adjustment
-parameters define a \code{renters_deduction} variable. Supports two formulas:
-\itemize{
-\item \code{renters_formula_pct}: \code{min(12 * housing_cost * rate, max)} (used by IN, MA)
-\item \code{renters_formula_min}: \code{min(12 * housing_cost, max)}
-}
+Computes a state-specific renters deduction using filing-status-specific
+parameters. Exact filing-status matches are used first, with filing_status
+== "all" as a fallback.
 }
 \details{
-Called by \code{\link[=calculate_state_taxable_income]{calculate_state_taxable_income()}} after the general adjustment loop.
+Supported formulas:
+\itemize{
+\item renters_formula_min:
+pmin(12 * housing_cost, renters_max)
+\item renters_formula_cap plus renters_formula_rate:
+pmin(12 * housing_cost * renters_rate, renters_max)
+}
 }
