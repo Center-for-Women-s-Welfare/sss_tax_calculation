@@ -13,7 +13,7 @@ calculate_state_taxable_income(
 }
 \arguments{
 \item{calculations_df}{Dataframe with starting_income, household_type,
-child_care_cost, health_ins_premium, and any other columns referenced
+child_care_cost, and any other columns referenced
 by state adjustment methods}
 
 \item{tax_state_adjustments_all_df}{Dataframe of state TI-adjustment

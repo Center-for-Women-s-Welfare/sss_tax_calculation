@@ -18,14 +18,14 @@ calculate_premium_tax_credit <- function(df, fpl_params, ptc_params) {
     stop("df is missing required columns: ",
          paste(missing_calculation_cols, collapse = ", "))
   }
-  
+
   required_fpl_cols <- c("household_size", "fpl_amount")
   missing_fpl_cols <- setdiff(required_fpl_cols, names(fpl_params))
   if (length(missing_fpl_cols) > 0) {
     stop("fpl_params is missing required columns: ",
          paste(missing_fpl_cols, collapse = ", "))
   }
-  
+
   required_ptc_cols <- c(
     "income_pct_fpl_min", "income_pct_fpl_max",
     "required_income_rate_min", "required_income_rate_max"
@@ -35,7 +35,7 @@ calculate_premium_tax_credit <- function(df, fpl_params, ptc_params) {
     stop("ptc_params is missing required columns: ",
          paste(missing_ptc_cols, collapse = ", "))
   }
-  
+
   ptc_params <- ptc_params %>%
     dplyr::arrange(income_pct_fpl_min)
   
@@ -65,7 +65,7 @@ calculate_premium_tax_credit <- function(df, fpl_params, ptc_params) {
   
   required_income_rate <- rep(NA_real_, nrow(df))
   matched <- !is.na(bracket_index)
-  
+
   if (any(matched)) {
     min_pct <- ptc_params$income_pct_fpl_min[bracket_index[matched]]
     max_pct <- ptc_params$income_pct_fpl_max[bracket_index[matched]]
@@ -77,7 +77,7 @@ calculate_premium_tax_credit <- function(df, fpl_params, ptc_params) {
       0,
       (pct_fpl_for_rate[matched] - min_pct) / (max_pct - min_pct)
     )
-    
+
     required_income_rate[matched] <- min_rt + prop * (max_rt - min_rt)
   }
   

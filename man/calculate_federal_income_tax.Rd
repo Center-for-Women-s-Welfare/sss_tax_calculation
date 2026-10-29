@@ -7,7 +7,7 @@
 calculate_federal_income_tax(
   df,
   federal_standard_deduction,
-  use_marketplace_premium = FALSE
+  default_health_insurance_scenario = "employer"
 )
 }
 \arguments{
@@ -16,8 +16,10 @@ premium columns.}
 
 \item{federal_standard_deduction}{Dataframe with standard deductions by filing status}
 
-\item{use_marketplace_premium}{If TRUE, use \code{health_ins_market} when present,
-falling back to \code{health_ins_premium} when the marketplace value is missing.}
+\item{default_health_insurance_scenario}{Scenario applied when a row does not
+already provide \code{health_insurance_scenario}. Must be one of
+\code{"employer"}, \code{"marketplace"}, \code{"marketplace_unsubsidized"},
+or \code{"marketplace_ptc"}.}
 }
 \value{
 Dataframe with deduction and taxable income columns added
