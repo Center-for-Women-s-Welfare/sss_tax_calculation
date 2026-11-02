@@ -73,7 +73,8 @@ solve_starting_income_iterative <- function(df,
 
   federal_params <- load_federal_tax_params(year)
   
-  credit_params <- federal_params$fed_credits
+  credit_params <- federal_params$fed_credits %>%
+    dplyr::filter(sss_year == !!year)
   
   eitc_params  <- credit_params %>% dplyr::filter(credit == "eitc")
   cdctc_params <- credit_params %>% dplyr::filter(credit == "cdctc")

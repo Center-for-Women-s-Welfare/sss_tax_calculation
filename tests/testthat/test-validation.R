@@ -3,7 +3,7 @@
 
 library(testthat)
 
-# helper function for creating a mock
+# helper function for creating a mock data frame with required columns
 create_mock_df <- function(nrows = 10) {
   data.frame(
     subtotal2 = runif(nrows, min = 1000, max = 5000),

@@ -413,7 +413,7 @@ calculate_ctc_credit <- function(df, ctc_params_list) {
 #' @param federal_standard_deduction Dataframe with standard deductions by filing status
 #' @param default_health_insurance_scenario Scenario applied when a row does not
 #'   already provide `health_insurance_scenario`. Must be one of
-#'   `"employer"`, `"marketplace"`, `"marketplace_unsubsidized"`,
+#'   `"employer"`, `"marketplace_unsubsidized"`,
 #'   or `"marketplace_ptc"`.
 #' @return Dataframe with deduction and taxable income columns added
 calculate_federal_income_tax <- function(df,
@@ -451,7 +451,7 @@ calculate_federal_income_tax <- function(df,
     rep(FALSE, nrow(df))
   }
 
-  marketplace_scenarios <- c("marketplace", "marketplace_unsubsidized", "marketplace_ptc")
+  marketplace_scenarios <- c("marketplace_unsubsidized", "marketplace_ptc")
   row_is_marketplace <- row_scenario %in% marketplace_scenarios
   scenario_selected_premium <- ifelse(
     row_is_marketplace,
