@@ -81,8 +81,6 @@ calculate_premium_tax_credit <- function(df, fpl_params, ptc_params) {
     required_income_rate[matched] <- min_rt + prop * (max_rt - min_rt)
   }
   
-  df <- df %>%
-    dplyr::mutate(required_income_rate = required_income_rate)
   # Highest finite upper bound of the schedule. If the schedule has no
   # open-ended (Inf) bracket, incomes at or above this are ineligible
   # (e.g. 2026: no PTC at or above 400% FPL).
@@ -91,7 +89,7 @@ calculate_premium_tax_credit <- function(df, fpl_params, ptc_params) {
   
   df <- df %>%
     mutate(
-      required_income_rate = required_income_rate,
+      required_income_rate = .env$required_income_rate,
       ptc_eligible = if (has_open_top) {
         !is.na(pct_fpl)
       } else {
