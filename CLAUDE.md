@@ -48,13 +48,11 @@ All federal tax math lives here as composable dataframe-in/dataframe-out functio
 ### Health insurance scenario behavior
 
 - Row-level input columns from `sss_production` are supported directly:
-  - `health_insurance_scenario`
+  - `health_ins_market`
   - `health_insurance_premium_used`
 - Legacy inputs remain supported:
   - `health_ins_premium`
-  - `health_ins_market`
-- Supported scenario values: `"employer"`, `"marketplace"`, `"marketplace_unsubsidized"`, `"marketplace_ptc"`.
-- Mapping rule: upstream `"marketplace"` defaults to unsubsidized marketplace behavior unless a row is explicitly `"marketplace_ptc"`.
+- Supported scenario values: `"employer"`, `"marketplace_unsubsidized"`, `"marketplace_ptc"`.
 
 **Reconciliation needed with `sss_production`:** the federal tax functions here may be out of sync with updates made to the federal tax code in `sss_production` since this package was split out. Before considering the state-tax integration complete, reconcile `R/tax_functions.R` and `R/data_loader.R` in this repo against `tax_federal.R` and `tax_functions.R` in `sss_production` — federal logic changes made there post-split may not have been ported back here.
 

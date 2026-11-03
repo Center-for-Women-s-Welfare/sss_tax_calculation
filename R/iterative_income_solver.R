@@ -160,7 +160,7 @@ solve_starting_income_iterative <- function(df,
   derived_cols <- c(
     "ss_income", "medicare_threshold", "ss_tax", "medicare_tax", 
     "total_fed_payroll_tax",
-    "fed_sd", "health_insurance_premium_used", "esi_premium_deduction",
+    "fed_sd", "esi_premium_deduction",
     "total_fed_deductions", "taxable_income", "federal_cumulative_tax",
     "eitc_credit",
     "cdctc_max", "cdctc_eligible_expense", "cdctc_rate", "cdctc_estimate", 
