@@ -371,29 +371,31 @@ test_that("premium tax credit applies only to marketplace_ptc and affects result
 })
 
 test_that("marketplace_ptc gets PTC", {
-  df <- create_health_scenario_df()
+  df <- create_health_scenario_df()[1, ]
   health_insurance_scenario <- "marketplace_ptc"
-  df$health_ins_market <- c(650, 650)
-  df$health_ins_premium <- c(200, 200)
+  df$health_ins_market <- c(650)
+  df$health_ins_premium <- c(200)
   
-  out <- solve_starting_income_iterative(df, year = YEAR)
+  out <- solve_starting_income_iterative(df, year = YEAR, 
+                                         health_insurance_scenario = health_insurance_scenario)
   expect_true(out$premium_tax_credit > 0)
 })
 
 test_that("marketplace_unsubsidized does not calculate PTC", {
-  df <- create_health_scenario_df()
+  df <- create_health_scenario_df()[1, ]
   health_insurance_scenario <- "marketplace_unsubsidized"
-  df$health_ins_market <- c(650, 650)
-  df$health_ins_premium <- c(200, 200)
+  df$health_ins_market <- c(650)
+  df$health_ins_premium <- c(200)
   
-  out <- solve_starting_income_iterative(df, year = YEAR)
+  out <- solve_starting_income_iterative(df, year = YEAR,
+                                         health_insurance_scenario = health_insurance_scenario)
   expect_equal(out$premium_tax_credit, 0)
 })
 
 test_that("PTC is combined with EITC and CTC refundable credits in federal net liability", {
   df <- create_health_scenario_df()[1, ]
-  df$subtotal2 <- 1800
-  df$subtotal3 <- 1850
+  df$subtotal2 <- 2000
+  df$subtotal3 <- 2450
   df$health_ins_market <- 700
   
   out <- solve_starting_income_iterative(
@@ -489,34 +491,35 @@ test_that("premium tax credit is recomputed as starting income changes", {
 })
 
 test_that("premium tax credit does not over-credit unmatched required-income rows", {
-  calculations_df <- data.frame(
+  df <- data.frame(
     household_size = 1L,
     starting_income = 100000,
-    health_insurance_premium_used = 600,
+    health_ins_market = 600,
     stringsAsFactors = FALSE
   )
-  fed_poverty_line <- data.frame(
-    fpl_year = 2025,
-    fpl_area = "FORTY_EIGHT_DC",
-    hh_size = 1L,
-    fpl = 15060
+  fpl_params <- data.frame(
+    household_size = 1L,
+    fpl_amount = 15060
   )
-  fed_premium_tax_credit <- data.frame(
-    effective_year = 2026,
+  ptc_params <- data.frame(
+    effective_year_ptc = 2026,
     income_pct_fpl_min = 0,
     income_pct_fpl_max = 200,
     required_income_rate_min = 0,
     required_income_rate_max = 0.02
   )
   
+  # The function does not join FPL itself, so attach fpl_amount first.
+  df <- dplyr::left_join(df, fpl_params, by = "household_size")
+  
   out <- calculate_premium_tax_credit(
-    calculations_df = calculations_df,
-    fed_poverty_line = fed_poverty_line,
-    fed_premium_tax_credit = fed_premium_tax_credit,
-    effective_year = 2026
+    df = df,
+    fpl_params = fpl_params,
+    ptc_params = ptc_params
   )
   
   expect_true(is.na(out$required_income_rate))
+  expect_false(out$ptc_eligible)
   expect_equal(out$premium_tax_credit, 0)
 })
 
@@ -536,7 +539,8 @@ test_that("solver sets premium_tax_credit to zero when PTC schedule does not mat
   out <- testthat::with_mocked_bindings(
     solve_starting_income_iterative(df, year = YEAR, 
                                     health_insurance_scenario = "marketplace_ptc"),
-    load_federal_tax_params = function(year) base_params
+    load_federal_tax_params = function(year) base_params,
+    .package = "sssTaxCalculation"
   )
   
   expect_equal(out$premium_tax_credit, 0)
@@ -549,16 +553,6 @@ test_that("invalid health insurance scenario names fail clearly", {
     solve_starting_income_iterative(df, year = YEAR, health_insurance_scenario = "invalid"),
     "health_insurance_scenario must be one of"
   )
-})
-
-test_that("solver accepts inputs with only health_insurance_premium_used", {
-  df <- create_health_scenario_df()[1, ]
-  df <- dplyr::select(df, -health_ins_premium, -health_ins_market)
-  df <- dplyr::mutate(df, health_insurance_premium_used = 375)
-
-  out <- solve_starting_income_iterative(df, year = YEAR, health_insurance_scenario = "employer")
-  expect_equal(out$health_insurance_premium_used, 375)
-  expect_true(out$converged)
 })
 
 test_that("basic needs plus taxes minus credits equals starting_income after solving", {

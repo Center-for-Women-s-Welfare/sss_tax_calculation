@@ -70,6 +70,26 @@ solve_starting_income_iterative <- function(df,
     health_insurance_scenario,
     "marketplace_ptc"
   )
+  
+  if (use_marketplace_premium) {
+    premium_used <- if ("health_insurance_premium_used" %in% names(df)) {
+      df$health_insurance_premium_used
+    } else {
+      rep(NA_real_, nrow(df))
+    }
+    premium_market <- if ("health_ins_market" %in% names(df)) {
+      df$health_ins_market
+    } else {
+      rep(NA_real_, nrow(df))
+    }
+    
+    if (any(is.na(premium_used) & is.na(premium_market))) {
+      stop(
+        "Marketplace scenario rows require health_insurance_premium_used or health_ins_market.",
+        call. = FALSE
+      )
+    }
+  }
 
   federal_params <- load_federal_tax_params(year)
   

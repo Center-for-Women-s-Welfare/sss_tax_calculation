@@ -50,7 +50,6 @@ update_employer_golden_fixture <- function(write = TRUE) {
       case = "single_adult_baseline",
       year = 2026,
       state = NA_character_,
-      health_insurance_scenario = "employer",
       starting_income = NA_real_,
       total_taxes = NA_real_,
       total_credits = NA_real_,
@@ -61,8 +60,7 @@ update_employer_golden_fixture <- function(write = TRUE) {
   }
 
   key_match <- fixture$case == "single_adult_baseline" &
-    fixture$year == 2026 &
-    fixture$health_insurance_scenario == "employer"
+    fixture$year == 2026 
 
   if (!any(key_match)) {
     fixture <- dplyr::bind_rows(
@@ -71,7 +69,6 @@ update_employer_golden_fixture <- function(write = TRUE) {
         case = "single_adult_baseline",
         year = 2026,
         state = NA_character_,
-        health_insurance_scenario = "employer",
         starting_income = NA_real_,
         total_taxes = NA_real_,
         total_credits = NA_real_,
@@ -79,8 +76,7 @@ update_employer_golden_fixture <- function(write = TRUE) {
       )
     )
     key_match <- fixture$case == "single_adult_baseline" &
-      fixture$year == 2026 &
-      fixture$health_insurance_scenario == "employer"
+      fixture$year == 2026 
   }
 
   fixture$starting_income[key_match] <- out$starting_income[[1]]
