@@ -3,7 +3,7 @@
 
 library(testthat)
 
-# helper function for creating a mock
+# helper function for creating a mock data frame with required columns
 create_mock_df <- function(nrows = 10) {
   data.frame(
     subtotal2 = runif(nrows, min = 1000, max = 5000),
@@ -211,4 +211,11 @@ test_that("Original dataframe is preserved after validation", {
   df_copy <- df_original
   validate_input(df_copy)
   expect_equal(df_original, df_copy)
+})
+
+test_that("validate_input accepts rows with only health_insurance_premium_used", {
+  mock_df <- create_mock_df()
+  mock_df$health_ins_premium <- NULL
+  mock_df$health_insurance_premium_used <- runif(nrow(mock_df), min = 0, max = 2000)
+  expect_true(validate_input(mock_df))
 })

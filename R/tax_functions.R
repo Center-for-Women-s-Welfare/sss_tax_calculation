@@ -415,25 +415,25 @@ calculate_ctc_credit <- function(df, ctc_params_list) {
 #'   falling back to `health_ins_premium` when the marketplace value is missing.
 #' @return Dataframe with deduction and taxable income columns added
 calculate_federal_income_tax <- function(df, federal_standard_deduction, use_marketplace_premium = FALSE) {
-
-    employer_premium <- if ("health_ins_premium" %in% names(df)) {
-        df$health_ins_premium
-      } else {
-          rep(NA_real_, nrow(df))
-        }
   
-    marketplace_premium <- if ("health_ins_market" %in% names(df)) {
-          df$health_ins_market
-        } else {
-            rep(NA_real_, nrow(df))
-          }
-    
-    selected_health_premium <- if (use_marketplace_premium) {
-            dplyr::coalesce(marketplace_premium, employer_premium)
-          } else {
-              employer_premium
-            }
-      
+  employer_premium <- if ("health_ins_premium" %in% names(df)) {
+    df$health_ins_premium
+  } else {
+    rep(NA_real_, nrow(df))
+  }
+  
+  marketplace_premium <- if ("health_ins_market" %in% names(df)) {
+    df$health_ins_market
+  } else {
+    rep(NA_real_, nrow(df))
+  }
+  
+  selected_health_premium <- if (use_marketplace_premium) {
+    dplyr::coalesce(marketplace_premium, employer_premium)
+  } else {
+    employer_premium
+  }
+  
   
   df %>%
     mutate(

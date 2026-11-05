@@ -41,8 +41,7 @@ test_that("employer scenario golden-row regression is stable (fixture-backed)", 
   row <- fixture |>
     dplyr::filter(
       case == "single_adult_baseline",
-      year == 2026,
-      health_insurance_scenario == "employer"
+      year == 2026
     )
 
   expect_equal(nrow(row), 1)

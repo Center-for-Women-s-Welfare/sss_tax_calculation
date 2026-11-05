@@ -27,12 +27,11 @@ solve_starting_income_iterative <- function(df,
                                             tolerance = 1.0,
                                             damping = 0.5,
                                             debug = FALSE) {
-  
   # Needed if state = NULL, since local tax calculations still require a tax_rate_local column.
   if (!"tax_rate_local" %in% names(df)) {
     df$tax_rate_local <- 0
   }
-  
+
   validate_input(df, year, state)
   
   if (!is.null(state)) {
@@ -43,7 +42,7 @@ solve_starting_income_iterative <- function(df,
     # Pre-build EITC lookup object used by special state credit handlers.
     state_eitc_lookup <- build_state_eitc_lookup(state_params$state_eitc_lookup)
   }
-  
+
   valid_health_insurance_scenarios <- c(
     "employer",
     "marketplace_unsubsidized",
@@ -61,7 +60,7 @@ solve_starting_income_iterative <- function(df,
       "."
     )
   }
-  
+
   use_marketplace_premium <- health_insurance_scenario %in% c(
     "marketplace_unsubsidized",
     "marketplace_ptc"
@@ -72,34 +71,42 @@ solve_starting_income_iterative <- function(df,
     "marketplace_ptc"
   )
   
-  credit_params <- readr::read_csv(
-    system.file("extdata", "federal", as.character(year), "tax_fed_credits.csv",
-                package = "sssTaxCalculation"),
-    show_col_types = FALSE
-  ) %>%
+  if (use_marketplace_premium) {
+    premium_used <- if ("health_insurance_premium_used" %in% names(df)) {
+      df$health_insurance_premium_used
+    } else {
+      rep(NA_real_, nrow(df))
+    }
+    premium_market <- if ("health_ins_market" %in% names(df)) {
+      df$health_ins_market
+    } else {
+      rep(NA_real_, nrow(df))
+    }
+    
+    if (any(is.na(premium_used) & is.na(premium_market))) {
+      stop(
+        "Marketplace scenario rows require health_insurance_premium_used or health_ins_market.",
+        call. = FALSE
+      )
+    }
+  }
+
+  federal_params <- load_federal_tax_params(year)
+  
+  credit_params <- federal_params$fed_credits %>%
     dplyr::filter(sss_year == !!year)
   
   eitc_params  <- credit_params %>% dplyr::filter(credit == "eitc")
   cdctc_params <- credit_params %>% dplyr::filter(credit == "cdctc")
   ctc_params   <- credit_params %>% dplyr::filter(credit == "ctc")
-  
-  ptc_params <- readr::read_csv(
-    system.file("extdata", "federal", as.character(year),
-                "tax_fed_premium_tax_credit.csv", package = "sssTaxCalculation"),
-    show_col_types = FALSE
-  ) %>%
+
+  ptc_params <- federal_params$fed_premium_tax_credit %>%
     dplyr::filter(effective_year_ptc == !!effective_year_ptc)
   
   # Federal Poverty Line (FPL) table used for premium tax credit calculations
   fpl_year <- as.integer(effective_year_ptc) - 1L
   
-  fpl_params <- readr::read_csv(
-    system.file(
-      "extdata", "federal", as.character(year), "tax_fed_poverty_line.csv",
-      package = "sssTaxCalculation"
-    ),
-    show_col_types = FALSE
-  ) %>%
+  fpl_params <- federal_params$fed_poverty_line %>%
     dplyr::mutate(
       effective_year_fpl = as.integer(fpl_year),
       household_size = as.integer(hh_size),
@@ -125,28 +132,16 @@ solve_starting_income_iterative <- function(df,
     ) %>%
     dplyr::select(-fpl_household_size)
   
-  federal_standard_deduction <- readr::read_csv(
-    system.file("extdata", "federal", as.character(year), "tax_fed_sd.csv",
-                package = "sssTaxCalculation"),
-    show_col_types = FALSE
-  ) %>%
+  federal_standard_deduction <- federal_params$fed_sd %>%
     dplyr::filter(sss_year == !!year) %>%
     dplyr::select(-"sss_year") %>%
     tidyr::pivot_wider(names_from = filing_status, values_from = deduction)
   
-  federal_tax_brackets <- readr::read_csv(
-    system.file("extdata", "federal", as.character(year), "tax_fed_income_brackets.csv",
-                package = "sssTaxCalculation"),
-    show_col_types = FALSE
-  ) %>%
+  federal_tax_brackets <- federal_params$fed_brackets %>%
     dplyr::filter(sss_year == !!year) %>%
     dplyr::select(-"sss_year")
   
-  federal_payroll <- readr::read_csv(
-    system.file("extdata", "federal", as.character(year), "tax_fed_payroll.csv",
-                package = "sssTaxCalculation"),
-    show_col_types = FALSE
-  )
+  federal_payroll <- federal_params$fed_payroll
   
   eitc_lookup_df    <- build_eitc_lookup(eitc_params)
   cdctc_params_list <- extract_cdctc_params(cdctc_params)
@@ -165,7 +160,7 @@ solve_starting_income_iterative <- function(df,
   derived_cols <- c(
     "ss_income", "medicare_threshold", "ss_tax", "medicare_tax", 
     "total_fed_payroll_tax",
-    "fed_sd", "health_insurance_premium_used", "esi_premium_deduction",
+    "fed_sd", "esi_premium_deduction",
     "total_fed_deductions", "taxable_income", "federal_cumulative_tax",
     "eitc_credit",
     "cdctc_max", "cdctc_eligible_expense", "cdctc_rate", "cdctc_estimate", 
@@ -280,7 +275,6 @@ solve_starting_income_iterative <- function(df,
       )
   }
 
-      
   if (debug) {
     cat("\n=== Starting Iterative Solver ===\n")
     cat("Initial starting_income range:",
@@ -288,10 +282,10 @@ solve_starting_income_iterative <- function(df,
     cat("Max iterations:", max_iterations, "\n")
     cat("Tolerance: $", tolerance, "\n\n")
   }
-  
+
   for (iter in 1:max_iterations) {
     df$previous_income <- df$starting_income
-    
+
     df <- recompute_derived(df)
     
     raw_new_income <- (df$subtotal3 * 12) + df$total_taxes - df$total_credits
@@ -304,7 +298,7 @@ solve_starting_income_iterative <- function(df,
       df$starting_income,
       damping * df$previous_income + (1 - damping) * raw_new_income
     )
-    
+
     df$income_diff       <- abs(df$new_starting_income - df$previous_income)
     df$row_converged     <- df$income_diff < tolerance
     df$final_income_diff <- df$income_diff
@@ -324,7 +318,7 @@ solve_starting_income_iterative <- function(df,
       break
     }
   }
-  
+
   non_converged_idx <- which(!df$converged)
   if (length(non_converged_idx) > 0) {
     warning(sprintf(
@@ -335,9 +329,9 @@ solve_starting_income_iterative <- function(df,
     ))
     df$iteration_count[non_converged_idx] <- max_iterations
   }
-  
+
   print_convergence_summary(df, debug)
-  
+
   # Critical: recompute all derived columns at the final updated starting_income
   df <- recompute_derived(df)
   

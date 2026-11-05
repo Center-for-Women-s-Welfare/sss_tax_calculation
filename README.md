@@ -84,6 +84,7 @@ solve_starting_income_iterative(
   df,                    # Required: Dataframe with basic needs data
   year,                  # Required: Tax year (e.g., 2026)
   state = NULL,          # Optional: State code (for Phase 2)
+  health_insurance_scenario = "employer", # Optional default when scalar scenario is absent
   max_iterations = 100,  # Optional: Max iterations before fallback
   tolerance = 1.0,       # Optional: Convergence tolerance in dollars
   debug = FALSE          # Optional: Enable detailed output
@@ -91,9 +92,34 @@ solve_starting_income_iterative(
 ```
 
 **Key Changes from Original Design:**
-- Tax parameters are **loaded automatically** from `data/federal/{year}/` CSV files
+- Tax parameters are **loaded automatically** from `inst/extdata/federal/{year}/` CSV files
 - No need to pass `tax_params` parameter
 - Simpler function signature
+
+### Health insurance scenario compatibility
+
+The solver supports both upstream row-level columns from `sss_production` and legacy columns:
+
+- Row-level upstream fields:
+  - `health_ins_market` (marketplace premium)
+  - `health_insurance_premium_used` (monthly premium selected upstream)
+- Legacy fields:
+  - `health_ins_premium` (employer premium)
+
+Supported scenario values and mappings:
+
+- `"employer"`: employer-sponsored plan (eligible for ESI deduction)
+- `"marketplace_unsubsidized"`: marketplace premium with no PTC
+- `"marketplace_ptc"`: marketplace premium with premium tax credit (PTC)
+
+If `health_insurance_scenario` is present in the config file, it is used as the source of truth.
+If absent, the solver argument `health_insurance_scenario` is used for backward compatibility.
+When scenarios are supplied only through the solver argument (legacy mode), scenario-specific legacy columns are preferred and `health_insurance_premium_used` is treated as fallback.
+Marketplace scenarios require marketplace-compatible premiums (`health_insurance_premium_used` or `health_ins_market`).
+
+ESI deduction policy: the federal ESI premium deduction is applied only in the `"employer"` scenario.
+
+Premium tax credit policy: PTC is applied only in the `"marketplace_ptc"` scenario and recomputed each solver iteration from current income and premium.
 
 ## Input Requirements
 
@@ -207,26 +233,51 @@ result %>%
 
 ```
 sss_tax_calculation/
-├── src/
+├── R/
 
-│   ├── calculations/
-│   │   └── iterative_income_solver.R    # Main iterative solver
-│   └── utils/
+│       ├── iterative_income_solver.R    # Main iterative solver
 │       ├── diagnostics.R                 # Convergence diagnostics
 │       ├── validation.R                  # Input validation
 │       ├── tax_functions.R               # Tax calculation helpers
+│       ├── tax_local.R                   # Local income tax calculations
+│       ├── tax_premium_credit.R          # Optional calculation of premium tax credit for marketplace health insurance
+│       ├── tax_state.R                   # State tax functions
+│       ├── tax_state_special_cases.R     # Unique state tax credits, etc.
 │       └── data_loader.R                 # CSV data loading
 │── data/
 │       └── federal/                      # Federal tax parameters by year
-|       └── 2026/
-|       ├── tax_fed_credits_df.csv
-|       ├── tax_fed_income_brackets_df.csv
-|       ├── tax_fed_payroll_df.csv
-|       └── tax_fed_sd_df.csv
+|           └── 2026/
+|               ├── tax_fed_credits.csv
+|               ├── tax_fed_income_brackets.csv
+|               ├── tax_fed_payroll.csv
+|               ├── tax_fed_poverty_line.csv
+|               ├── tax_fed_premium_tax_credit.csv
+|               └── tax_fed_sd.csv
+│       └── local/                        # Local tax parameters by year
+|           └── 2026/
+|               └── tax_local_income_tax.csv
+│       └── state/                        # State tax parameters by year
+|           └── 2026/
+|               ├── tax_state_credits.csv
+|               ├── tax_state_eitc_lookup.csv
+|               ├── tax_state_eitc_params.csv
+|               ├── tax_state_income_brackets.csv
+|               ├── tax_state_payroll.csv
+|               ├── tax_state_renters_double_bracket.csv
+|               ├── tax_state_special_or_wfhdc.csv
+|               ├── tax_state_ti_adjustments.csv
+|               ├── tax_state_variable_brackets.csv
 ├── tests/                                 # Test suite (if needed)
-│   ├── requirements.md
-│   ├── design.md
-│   └── tasks.md
+│       └── testthat/
+|           ├── health_insurance_employer_golden.csv
+|           ├── helper-update-employer-golden-fixture.R
+|           ├── test-health-insurance-scenarios-regression.R
+|           ├── test-iterative_income_solver.R
+|           ├── test-mo_local_income_tax.R
+|           ├── test-state_tax_integration.R
+|           ├── test-validation.R
+|           └── test-wa_wftc_comprehensive.csv
+│   └── testthat.R
 └── README.md                              # This file
 ```
 
@@ -354,7 +405,7 @@ This will print:
 Tax parameters are stored in CSV files organized by year:
 
 ```
-src/data/federal/2026/
+inst/extdata/federal/2026/
 ├── tax_fed_credits_df.csv       # EITC, CDCTC, CTC parameters
 ├── tax_fed_income_brackets_df.csv  # Federal tax brackets
 ├── tax_fed_payroll_df.csv       # Social Security, Medicare rates
@@ -365,7 +416,7 @@ src/data/federal/2026/
 
 Tax laws change annually. To update for a new year:
 
-1. Create new directory: `src/data/federal/{year}/`
+1. Create new directory: `inst/extdata/federal/{year}/`
 2. Populate with updated CSV files following existing schema
 3. Update tests with new expected values
 4. Run validation suite

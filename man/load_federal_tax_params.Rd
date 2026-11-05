@@ -10,7 +10,9 @@ load_federal_tax_params(year)
 \item{year}{Tax year (e.g., 2026)}
 }
 \value{
-Named list with four dataframes: fed_payroll, fed_credits, fed_brackets, fed_sd
+Named list with federal parameter tables:
+\code{fed_payroll}, \code{fed_credits}, \code{fed_brackets}, \code{fed_sd},
+\code{fed_premium_tax_credit}, and \code{fed_poverty_line}
 }
 \description{
 Loads all federal tax parameter CSVs for a specific year from the package data directory
