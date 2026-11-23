@@ -129,9 +129,16 @@ calculate_tax_from_brackets <- function(df, brackets_df,
     group_by(row_id) %>%
     summarize(!!output_col := sum(tax_at_bracket, na.rm = TRUE), .groups = "drop")
 
-  df_original %>%
+  out <- df_original %>%
     left_join(df_calc, by = "row_id") %>%
     select(-row_id)
+  
+  zero_income <- !is.na(out[[taxable_income_var]]) &
+    out[[taxable_income_var]] == 0 &
+    out[[filing_status_var]] %in% brackets_df$filing_status
+  
+  out[[output_col]][zero_income] <- 0
+  out
 }
 
 #' Apply a Calculation Method to a Value Vector
