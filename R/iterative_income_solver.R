@@ -39,7 +39,9 @@ solve_starting_income_iterative <- function(df,
     # Load all state-specific parameter tables once, outside the iteration loop.
     # This avoids repeated disk reads and keeps each iteration focused on recomputation
     # of row-level tax outputs given the current starting_income guess.
-    state_params      <- load_state_tax_params(year, state)
+    state_params <- load_state_tax_params(year, 
+                                          state,
+                                          state_credit_effective_date = state_credit_effective_date)
     # Pre-build EITC lookup object used by special state credit handlers.
     state_eitc_lookup <- build_state_eitc_lookup(state_params$state_eitc_lookup)
   }
