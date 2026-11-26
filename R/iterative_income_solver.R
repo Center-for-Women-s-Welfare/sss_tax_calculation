@@ -26,7 +26,8 @@ solve_starting_income_iterative <- function(df,
                                             max_iterations = 100,
                                             tolerance = 1.0,
                                             damping = 0.5,
-                                            debug = FALSE) {
+                                            debug = FALSE,
+                                            state_credit_effective_date = NULL) {
   # Needed if state = NULL, since local tax calculations still require a tax_rate_local column.
   if (!"tax_rate_local" %in% names(df)) {
     df$tax_rate_local <- 0

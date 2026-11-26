@@ -38,9 +38,11 @@ load_federal_tax_params <- function(year) {
 #'
 #' @param year Tax year (e.g., 2026)
 #' @param state State postal code (e.g., "IA")
+#' @param state_credit_effective_date Optional four-digit credit snapshot year.
+#'   NULL retains the existing behavior.
 #' @return Named list with seven dataframes: state_brackets, state_credits, state_payroll,
 #'   state_ti_adjustments, state_variable_brackets, state_eitc_lookup, state_eitc_params
-load_state_tax_params <- function(year, state) {
+load_state_tax_params <- function(year, state, state_credit_effective_date = NULL) {
 
   state_tax_dir <- system.file("extdata", "state", as.character(year),
                                package = "sssTaxCalculation")
@@ -122,7 +124,7 @@ load_state_tax_params <- function(year, state) {
     }
   }
   
-  list(
+ params <-  list(
     state_brackets          = readr::read_csv(file.path(state_tax_dir, "tax_state_income_brackets.csv"),   show_col_types = FALSE) %>% filter_to_year_state(),
     state_credits           = readr::read_csv(file.path(state_tax_dir, "tax_state_credits.csv"),           show_col_types = FALSE) %>% ensure_num_children_column() %>% filter_to_year_state(),
     state_payroll           = readr::read_csv(file.path(state_tax_dir, "tax_state_payroll.csv"),           show_col_types = FALSE) %>% filter_to_year_state(),
@@ -135,4 +137,40 @@ load_state_tax_params <- function(year, state) {
     local_tax_type          = local_tax_type,            # scalar string
     local_income_tax_brackets   = local_income_tax_brackets      # tibble(), or bracket table when needed
   )
+ 
+ if (!is.null(state_credit_effective_date)) {
+   snapshot <- as.character(state_credit_effective_date)
+   
+   if (length(snapshot) != 1L || is.na(snapshot) ||
+       !grepl("^[0-9]{4}$", snapshot)) {
+     stop("state_credit_effective_date must be a single four-digit year.")
+   }
+   
+   params$state_credits <- params$state_credits %>%
+     dplyr::filter(as.character(.data$effective_date) == snapshot)
+   
+   if (nrow(params$state_credits) == 0L) {
+     stop("No state credit snapshot for ", state, " in ", year,
+          " with effective_date ", snapshot, ".")
+   }
+   
+   params$state_variable_brackets <- params$state_variable_brackets %>%
+     dplyr::filter(
+       is.na(.data$type) | .data$type != "credit" |
+         as.character(.data$effective_date) == snapshot
+     )
+   
+   orphan_brackets <- params$state_variable_brackets %>%
+     dplyr::filter(.data$type == "credit") %>%
+     dplyr::anti_join(
+       params$state_credits %>% dplyr::distinct(.data$variable_name),
+       by = "variable_name"
+     )
+   
+   if (nrow(orphan_brackets) > 0L) {
+     stop("Credit brackets lack matching state credit rows for snapshot ", snapshot, ".")
+   }
+ }
+ 
+ params
   }
